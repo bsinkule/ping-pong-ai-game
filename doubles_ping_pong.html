@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doubles Ping Pong</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #1a1a1a;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            user-select: none;
+        }
+        
+        #gameCanvas {
+            display: block;
+            background: #2d5a2d;
+            border: 2px solid #fff;
+            cursor: crosshair;
+        }
+        
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 18px;
+            z-index: 100;
+        }
+        
+        #powerMeter {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 30px;
+            height: 200px;
+            background: rgba(255,255,255,0.3);
+            border: 2px solid white;
+            border-radius: 15px;
+            z-index: 100;
+        }
+        
+        #powerFill {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            background: linear-gradient(to top, #ff4444, #ffff44, #44ff44);
+            border-radius: 0 0 13px 13px;
+            transition: height 0.1s;
+        }
+        
+        #aimArrow {
+            position: absolute;
+            width: 4px;
+            background: #ffff44;
+            transform-origin: bottom center;
+            z-index: 100;
+            display: none;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: white;
+            font-size: 14px;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui">
+        <div>Team 1: <span id="score1">0</span> | Team 2: <span id="score2">0</span></div>
+        <div id="gameInfo">Serving: Player 1</div>
+        <div id="instructions">Your serve! Click/tap to move, hold to aim & power</div>
+    </div>
+    
+    <div id="powerMeter">
+        <div id="powerFill"></div>
+    </div>
+    
+    <div id="aimArrow"></div>
+    
+    <div id="controls">
+        💻 Mouse: Click to move, hold to aim & shoot<br>
+        📱 Mobile: Tap to move, hold to aim & shoot
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const powerFill = document.getElementById('powerFill');
+        const aimArrow = document.getElementById('aimArrow');
+        
+        // Game state
+        let gameState = {
+            score1: 0,
+            score2: 0,
+            currentServer: 0,
+            servesLeft: 5,
+            currentHitter: 0,
+            ballInPlay: false,
+            gameWon: false
+        };
+        
+        // Game objects - initialize with default values
+        let table = {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+            netY: 0
+        };
+        
+        let ball = {
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            radius: 8,
+            trail: []
+        };
+        
+        let players = [
+            { x: 0, y: 0, targetX: 0, isUser: true, team: 1 },
+            { x: 0, y: 0, targetX: 0, isUser: false, team: 1 },
+            { x: 0, y: 0, targetX: 0, isUser: false, team: 2 },
+            { x: 0, y: 0, targetX: 0, isUser: false, team: 2 }
+        ];
+        
+        // Input handling
+        let inputStart = null;
+        let charging = false;
+        let chargePower = 0;
+        let aimAngle = 0;
+        
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            // Calculate table dimensions
+            table.x = canvas.width * 0.1;
+            table.y = canvas.height * 0.15;
+            table.width = canvas.width * 0.8;
+            table.height = canvas.height * 0.7;
+            table.netY = canvas.height * 0.5;
+            
+            // Position players
+            players[0].x = players[0].targetX = table.x + table.width * 0.3;
+            players[0].y = table.y + table.height * 0.85;
+            players[1].x = players[1].targetX = table.x + table.width * 0.7;
+            players[1].y = table.y + table.height * 0.85;
+            players[2].x = players[2].targetX = table.x + table.width * 0.3;
+            players[2].y = table.y + table.height * 0.15;
+            players[3].x = players[3].targetX = table.x + table.width * 0.7;
+            players[3].y = table.y + table.height * 0.15;
+            
+            // Position ball
+            ball.x = players[gameState.currentServer].x;
+            ball.y = players[gameState.currentServer].y - 30;
+        }
+        
+        function drawTable() {
+            // Table surface
+            ctx.fillStyle = '#0d4d0d';
+            ctx.fillRect(table.x, table.y, table.width, table.height);
+            
+            // Table border
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(table.x, table.y, table.width, table.height);
+            
+            // Net
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(table.x, table.netY - 3, table.width, 6);
+            
+            // Center line
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath();
+            ctx.moveTo(table.x + table.width/2, table.y);
+            ctx.lineTo(table.x + table.width/2, table.netY - 3);
+            ctx.moveTo(table.x + table.width/2, table.netY + 3);
+            ctx.lineTo(table.x + table.width/2, table.y + table.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+        
+        function drawPlayers() {
+            players.forEach((player, i) => {
+                // Player paddle
+                ctx.fillStyle = player.isUser ? '#4CAF50' : 
+                               player.team === 1 ? '#2196F3' : '#F44336';
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, 18, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Player number
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(i + 1, player.x, player.y + 5);
+                
+                // Highlight current hitter
+                if (i === gameState.currentHitter) {
+                    ctx.strokeStyle = '#ffff44';
+                    ctx.lineWidth = 4;
+                    ctx.beginPath();
+                    ctx.arc(player.x, player.y, 25, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+            });
+        }
+        
+        function drawBall() {
+            if (ball.trail.length > 1) {
+                // Ball trail
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                for (let i = 0; i < ball.trail.length - 1; i++) {
+                    const alpha = i / ball.trail.length;
+                    ctx.globalAlpha = alpha;
+                    ctx.moveTo(ball.trail[i].x, ball.trail[i].y);
+                    ctx.lineTo(ball.trail[i + 1].x, ball.trail[i + 1].y);
+                }
+                ctx.stroke();
+                ctx.globalAlpha = 1;
+            }
+            
+            // Ball
+            ctx.fillStyle = '#fff';
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+        }
+        
+        function updateBall() {
+            if (!gameState.ballInPlay) return;
+            
+            // Update trail
+            ball.trail.push({x: ball.x, y: ball.y});
+            if (ball.trail.length > 10) ball.trail.shift();
+            
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+            
+            // Ball physics
+            ball.vy += 0.15;
+            ball.vx *= 0.998;
+            ball.vy *= 0.998;
+            
+            // Bounce off table edges
+            if (ball.x <= table.x || ball.x >= table.x + table.width) {
+                ball.vx = -ball.vx * 0.8;
+                ball.x = Math.max(table.x, Math.min(table.x + table.width, ball.x));
+            }
+            
+            // Check if ball hits table surface
+            if (ball.y >= table.y && ball.y <= table.y + table.height && 
+                ball.x >= table.x && ball.x <= table.x + table.width) {
+                if (ball.vy > 0) {
+                    ball.vy = -Math.abs(ball.vy) * 0.7;
+                    ball.y = table.y - ball.radius;
+                }
+            }
+            
+            // Check scoring
+            if (ball.y > canvas.height + 50) {
+                scorePoint(players[gameState.currentHitter].team === 1 ? 2 : 1);
+            } else if (ball.y < -50) {
+                scorePoint(players[gameState.currentHitter].team === 1 ? 2 : 1);
+            }
+            
+            // Check paddle collisions
+            players.forEach((player, i) => {
+                const dist = Math.sqrt((ball.x - player.x) ** 2 + (ball.y - player.y) ** 2);
+                if (dist < ball.radius + 18 && i === gameState.currentHitter) {
+                    // Hit the ball
+                    const angle = Math.atan2(ball.y - player.y, ball.x - player.x);
+                    const speed = 8;
+                    ball.vx = Math.cos(angle) * speed;
+                    ball.vy = Math.sin(angle) * speed;
+                    
+                    switchHitter();
+                }
+            });
+        }
+        
+        function switchHitter() {
+            // Doubles rules: alternate within team, then switch teams
+            if (gameState.currentHitter === 0) gameState.currentHitter = 2;
+            else if (gameState.currentHitter === 2) gameState.currentHitter = 1;
+            else if (gameState.currentHitter === 1) gameState.currentHitter = 3;
+            else if (gameState.currentHitter === 3) gameState.currentHitter = 0;
+        }
+        
+        function updateAI() {
+            players.forEach((player, i) => {
+                if (player.isUser) return;
+                
+                // Move towards target position
+                const dx = player.targetX - player.x;
+                player.x += dx * 0.1;
+                
+                // AI logic
+                if (i === gameState.currentHitter && gameState.ballInPlay) {
+                    const ballSide = ball.x < table.x + table.width/2 ? 0.3 : 0.7;
+                    player.targetX = table.x + table.width * ballSide;
+                }
+            });
+        }
+        
+        function scorePoint(team) {
+            if (team === 1) {
+                gameState.score1++;
+                document.getElementById('score1').textContent = gameState.score1;
+            } else {
+                gameState.score2++;
+                document.getElementById('score2').textContent = gameState.score2;
+            }
+            
+            gameState.ballInPlay = false;
+            ball.trail = [];
+            
+            // Check win condition
+            if (gameState.score1 >= 15 || gameState.score2 >= 15) {
+                gameState.gameWon = true;
+                document.getElementById('gameInfo').textContent = `Team ${team} Wins!`;
+                document.getElementById('instructions').textContent = 'Game Over!';
+                return;
+            }
+            
+            // Next serve
+            gameState.servesLeft--;
+            if (gameState.servesLeft <= 0) {
+                gameState.currentServer = (gameState.currentServer + 1) % 4;
+                gameState.servesLeft = 5;
+            }
+            
+            gameState.currentHitter = gameState.currentServer;
+            document.getElementById('gameInfo').textContent = `Serving: Player ${gameState.currentServer + 1}`;
+            
+            // Reset ball position
+            setTimeout(() => {
+                ball.x = players[gameState.currentServer].x;
+                ball.y = players[gameState.currentServer].y - 30;
+                ball.vx = 0;
+                ball.vy = 0;
+                
+                if (gameState.currentServer === 0) {
+                    document.getElementById('instructions').textContent = 'Your serve! Hold to aim & power';
+                } else {
+                    document.getElementById('instructions').textContent = 'Click/tap to move, hold to aim & power';
+                    // Auto-serve for AI
+                    setTimeout(() => {
+                        const targetPlayer = gameState.currentServer < 2 ? 
+                            (gameState.currentServer === 0 ? 2 : 3) : 
+                            (gameState.currentServer === 2 ? 0 : 1);
+                        const target = players[targetPlayer];
+                        ball.vx = (target.x - ball.x) * 0.08;
+                        ball.vy = (target.y - ball.y) * 0.08;
+                        gameState.ballInPlay = true;
+                        switchHitter();
+                    }, 1000);
+                }
+            }, 1000);
+        }
+        
+        function getInputPosition(e) {
+            const rect = canvas.getBoundingClientRect();
+            if (e.touches) {
+                const touch = e.touches[0] || e.changedTouches[0];
+                return {
+                    x: touch.clientX - rect.left,
+                    y: touch.clientY - rect.top
+                };
+            } else {
+                return {
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                };
+            }
+        }
+        
+        function handleInputStart(e) {
+            e.preventDefault();
+            const pos = getInputPosition(e);
+            
+            if (gameState.currentHitter === 0) {
+                inputStart = pos;
+                charging = true;
+                chargePower = 0;
+                aimArrow.style.display = 'block';
+            } else {
+                // Move user player
+                if (pos.y > table.netY) {
+                    players[0].targetX = Math.max(table.x, Math.min(table.x + table.width, pos.x));
+                }
+            }
+        }
+        
+        function handleInputMove(e) {
+            if (!charging) return;
+            e.preventDefault();
+            
+            const pos = getInputPosition(e);
+            const dx = pos.x - inputStart.x;
+            const dy = pos.y - inputStart.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            chargePower = Math.min(distance / 100, 1);
+            aimAngle = Math.atan2(dy, dx);
+            
+            // Update power meter
+            powerFill.style.height = (chargePower * 100) + '%';
+            
+            // Update aim arrow
+            const player = players[0];
+            aimArrow.style.left = (player.x - 2) + 'px';
+            aimArrow.style.top = (player.y - 50) + 'px';
+            aimArrow.style.height = '50px';
+            aimArrow.style.transform = `rotate(${aimAngle - Math.PI/2}rad)`;
+        }
+        
+        function handleInputEnd(e) {
+            if (!charging) return;
+            e.preventDefault();
+            
+            charging = false;
+            aimArrow.style.display = 'none';
+            powerFill.style.height = '0%';
+            
+            if (chargePower > 0.1) {
+                // Serve or hit the ball
+                const speed = 4 + chargePower * 8;
+                ball.vx = Math.cos(aimAngle) * speed;
+                ball.vy = Math.sin(aimAngle) * speed;
+                gameState.ballInPlay = true;
+                
+                if (gameState.currentHitter === gameState.currentServer) {
+                    switchHitter();
+                }
+            }
+        }
+        
+        // Event listeners for both touch and mouse
+        canvas.addEventListener('touchstart', handleInputStart);
+        canvas.addEventListener('touchmove', handleInputMove);
+        canvas.addEventListener('touchend', handleInputEnd);
+        canvas.addEventListener('mousedown', handleInputStart);
+        canvas.addEventListener('mousemove', handleInputMove);
+        canvas.addEventListener('mouseup', handleInputEnd);
+        
+        // Prevent context menu on right click
+        canvas.addEventListener('contextmenu', e => e.preventDefault());
+        
+        // Game loop
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            drawTable();
+            drawPlayers();
+            drawBall();
+            
+            if (!gameState.gameWon) {
+                updateBall();
+                updateAI();
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // Initialize and start game
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        gameLoop();
+        
+        // Start message
+        setTimeout(() => {
+            document.getElementById('instructions').textContent = 'Your serve! Click/tap and hold to aim & power';
+        }, 500);
+    </script>
+</body>
+</html>
