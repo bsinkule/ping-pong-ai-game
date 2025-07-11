@@ -288,32 +288,13 @@
         // ball.vx *= 0.95; // Stronger friction
         // ball.vy *= 0.95;
 
-        // Bounce off table edges
-        if (ball.x <= table.x + ball.radius) {
-          ball.vx = Math.abs(ball.vx) * 0.8;
-          ball.x = table.x + ball.radius;
-        } else if (ball.x >= table.x + table.width - ball.radius) {
-          ball.vx = -Math.abs(ball.vx) * 0.8;
-          ball.x = table.x + table.width - ball.radius;
-        }
-
-        // Bounce off table surface (top and bottom)
-        if (ball.y <= table.y + ball.radius && ball.vy < 0) {
-          ball.vy = Math.abs(ball.vy) * 0.7;
-          ball.y = table.y + ball.radius;
-        } else if (
-          ball.y >= table.y + table.height - ball.radius &&
-          ball.vy > 0
+        // If the ball leaves the table on any side, score a point
+        if (
+          ball.x < table.x ||
+          ball.x > table.x + table.width ||
+          ball.y < table.y ||
+          ball.y > table.y + table.height
         ) {
-          ball.vy = -Math.abs(ball.vy) * 0.7;
-          ball.y = table.y + table.height - ball.radius;
-        }
-
-        // Check scoring - ball goes off the table
-        if (ball.y > canvas.height + 50) {
-          scorePoint(players[gameState.currentHitter].team === 1 ? 2 : 1);
-          return;
-        } else if (ball.y < -50) {
           scorePoint(players[gameState.currentHitter].team === 1 ? 2 : 1);
           return;
         }
