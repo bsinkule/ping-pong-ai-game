@@ -231,20 +231,20 @@
         if (bouncePing) {
           const elapsed = performance.now() - bouncePing.time;
           if (elapsed < 900) {
-            const maxRadius = 54;
-            const minRadius = 20;
+            const maxRadius = 20;
+            const minRadius = 6;
             const radius =
               minRadius + (maxRadius - minRadius) * (elapsed / 900);
             ctx.save();
             ctx.globalAlpha = 0.5 * (1 - elapsed / 900) + 0.3;
             ctx.beginPath();
             ctx.arc(bouncePing.x, bouncePing.y, radius, 0, Math.PI * 2);
-            ctx.fillStyle = (bouncePing.color || "#fff") + "4D"; // semi-transparent fill
+            ctx.fillStyle = "#eee8"; // subtle light grey, semi-transparent
             ctx.fill();
             ctx.globalAlpha = 1 - elapsed / 900;
             ctx.lineWidth = 5;
-            ctx.strokeStyle = bouncePing.color || "#fff";
-            ctx.shadowColor = bouncePing.color || "#fff";
+            ctx.strokeStyle = "#eee";
+            ctx.shadowColor = "#eee";
             ctx.shadowBlur = 18;
             ctx.stroke();
             ctx.restore();
