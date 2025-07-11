@@ -538,7 +538,7 @@
       function handleInputStart(e) {
         e.preventDefault();
         const pos = getInputPosition(e);
-        if (!gameState.isServe && ballStuck && stuckPlayer === 0 && !charging) {
+        if (ballStuck && stuckPlayer === 0 && !charging) {
           inputStart = pos;
           charging = true;
           chargePower = 0;
@@ -552,15 +552,8 @@
             Math.min(table.x + table.width, pos.x)
           );
         }
-        // If it's the user's turn to hit, allow aiming/charging
-        if (allowedHitter === 0) {
-          inputStart = pos;
-          charging = true;
-          chargePower = 0;
-          aimArrow.style.display = "block";
-        }
-        // If ball is stuck, allow aiming/charging
-        if (ballStuck && stuckPlayer === 0) {
+        // Only allow charging for serve, not for regular rally
+        if (!gameState.ballInPlay && allowedHitter === 0 && !charging) {
           inputStart = pos;
           charging = true;
           chargePower = 0;
@@ -571,6 +564,16 @@
       function handleInputMove(e) {
         if (!charging) return;
         e.preventDefault();
+
+        // Only allow aiming if serve or ball is stuck to user
+        if (
+          !(
+            (!gameState.ballInPlay && allowedHitter === 0) ||
+            (ballStuck && stuckPlayer === 0)
+          )
+        ) {
+          return;
+        }
 
         if (ballStuck && stuckPlayer === 0 && charging) {
           const pos = getInputPosition(e);
@@ -589,28 +592,44 @@
           return;
         }
 
-        const pos = getInputPosition(e);
-        const dx = inputStart.x - pos.x; // Reverse direction
-        const dy = inputStart.y - pos.y; // Reverse direction
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        // Serve aiming
+        if (!gameState.ballInPlay && allowedHitter === 0 && charging) {
+          const pos = getInputPosition(e);
+          const dx = inputStart.x - pos.x; // Reverse direction
+          const dy = inputStart.y - pos.y; // Reverse direction
+          const distance = Math.sqrt(dx * dx + dy * dy);
 
-        chargePower = Math.min(distance / 100, 1);
-        aimAngle = Math.atan2(dy, dx);
+          chargePower = Math.min(distance / 100, 1);
+          aimAngle = Math.atan2(dy, dx);
 
-        // Update power meter
-        powerFill.style.height = chargePower * 100 + "%";
+          // Update power meter
+          powerFill.style.height = chargePower * 100 + "%";
 
-        // Update aim arrow
-        const player = players[0];
-        const arrowLength = 40 + chargePower * 60; // Arrow grows with power
-        aimArrow.style.display = "block";
-        aimArrow.style.left = player.x - 2 + "px";
-        aimArrow.style.top = player.y - arrowLength + "px";
-        aimArrow.style.height = arrowLength + "px";
-        aimArrow.style.transform = `rotate(${aimAngle - Math.PI / 2}rad)`;
+          // Update aim arrow
+          const player = players[0];
+          const arrowLength = 40 + chargePower * 60; // Arrow grows with power
+          aimArrow.style.display = "block";
+          aimArrow.style.left = player.x - 2 + "px";
+          aimArrow.style.top = player.y - arrowLength + "px";
+          aimArrow.style.height = arrowLength + "px";
+          aimArrow.style.transform = `rotate(${aimAngle - Math.PI / 2}rad)`;
+        }
       }
 
       function handleInputEnd(e) {
+        // Only allow hitting if serve or ball is stuck to user
+        if (
+          !(
+            (!gameState.ballInPlay && allowedHitter === 0) ||
+            (ballStuck && stuckPlayer === 0)
+          )
+        ) {
+          charging = false;
+          aimArrow.style.display = "none";
+          powerFill.style.height = "0%";
+          return;
+        }
+
         if (ballStuck && stuckPlayer === 0 && charging) {
           charging = false;
           aimArrow.style.display = "none";
