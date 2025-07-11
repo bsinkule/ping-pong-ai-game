@@ -114,7 +114,6 @@
       // Add at the top, after gameState:
       let lastHitter = [0, 2]; // [team1Last, team2Last]
       let allowedHitter = 0; // index of player allowed to hit next
-      let lastBallSide = null; // 'top' or 'bottom'
       let ballStuck = false;
       let stuckPlayer = null;
 
@@ -186,7 +185,6 @@
         // In resizeCanvas, after setting currentServer:
         allowedHitter = gameState.currentServer;
         lastHitter = [0, 2];
-        lastBallSide = null;
       }
 
       function drawTable() {
@@ -219,12 +217,8 @@
       function drawPlayers() {
         players.forEach((player, i) => {
           ctx.save();
-          if (
-            i !== allowedHitter &&
-            ((player.team === 1 && ball.y > table.netY) ||
-              (player.team === 2 && ball.y < table.netY))
-          ) {
-            ctx.globalAlpha = 0.3; // Dim teammate who cannot hit
+          if (i !== allowedHitter) {
+            ctx.globalAlpha = 0.3; // Dim everyone except allowedHitter
           }
           // Player paddle
           ctx.fillStyle = player.isUser
@@ -324,16 +318,6 @@
           return;
         }
 
-        // Determine which side the ball is on
-        const ballSide = ball.y < table.netY ? "top" : "bottom";
-        if (lastBallSide && ballSide !== lastBallSide) {
-          // Ball crossed the net, update allowed hitter for receiving team
-          const teamIdx = ballSide === "top" ? 1 : 0;
-          allowedHitter =
-            lastHitter[teamIdx] === teamIdx * 2 ? teamIdx * 2 + 1 : teamIdx * 2;
-        }
-        lastBallSide = ballSide;
-
         // Check paddle collisions
         players.forEach((player, i) => {
           if (i !== allowedHitter) return;
@@ -341,10 +325,20 @@
             (ball.x - player.x) ** 2 + (ball.y - player.y) ** 2
           );
           if (dist < ball.radius + 18) {
-            // Correct teammate hit
-            const teamIdx = player.team - 1;
-            lastHitter[teamIdx] = i;
-            allowedHitter = i % 2 === 0 ? i + 1 : i - 1;
+            // Correct alternation: after a hit, only the teammate of the opposite team can hit next
+            let nextTeam, nextHitter;
+            if (i < 2) {
+              // Team 1 hit, so Team 2's turn
+              nextTeam = [2, 3];
+              nextHitter = lastHitter[1] === 2 ? 3 : 2;
+              lastHitter[0] = i;
+            } else {
+              // Team 2 hit, so Team 1's turn
+              nextTeam = [0, 1];
+              nextHitter = lastHitter[0] === 0 ? 1 : 0;
+              lastHitter[1] = i;
+            }
+            allowedHitter = nextHitter;
             // Hit the ball
             const angle = Math.atan2(ball.y - player.y, ball.x - player.x);
             const fixedHitSpeed = 4; // Same as serve speed for consistency
@@ -521,7 +515,6 @@
         }, 1000);
         lastHitter = [0, 2]; // Reset alternation on point
         allowedHitter = gameState.currentServer;
-        lastBallSide = null;
         ballStuck = false;
         stuckPlayer = null;
       }
@@ -644,7 +637,11 @@
           gameState.ballInPlay = true;
 
           if (gameState.currentHitter === gameState.currentServer) {
-            switchHitter();
+            // Set allowedHitter to diagonal opponent after serve
+            // 0→3, 1→2, 2→1, 3→0
+            const diagonal = [3, 2, 1, 0];
+            allowedHitter = diagonal[gameState.currentServer];
+            gameState.currentHitter = allowedHitter;
           }
         }
       }
