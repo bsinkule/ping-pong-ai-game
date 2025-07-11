@@ -164,7 +164,7 @@
 
         // Maintain 1.8:1 aspect ratio (portrait: height:width)
         const aspect = 1.8;
-        let maxTableHeight = window.innerHeight * 0.8;
+        let maxTableHeight = window.innerHeight * 0.7; // Reduce from 0.8 to 0.7
         let maxTableWidth = window.innerWidth * 0.9;
         let tableHeight = maxTableHeight;
         let tableWidth = tableHeight / aspect;
@@ -178,15 +178,15 @@
         table.y = (canvas.height - table.height) / 2;
         table.netY = table.y + table.height / 2;
 
-        // Position players
+        // Position players (move further back, 6% gap from end lines)
         players[0].x = players[0].targetX = table.x + table.width * 0.3;
-        players[0].y = table.y + table.height * 0.85;
+        players[0].y = table.y + table.height * 0.94;
         players[1].x = players[1].targetX = table.x + table.width * 0.7;
-        players[1].y = table.y + table.height * 0.85;
+        players[1].y = table.y + table.height * 0.94;
         players[2].x = players[2].targetX = table.x + table.width * 0.3;
-        players[2].y = table.y + table.height * 0.15;
+        players[2].y = table.y + table.height * 0.06;
         players[3].x = players[3].targetX = table.x + table.width * 0.7;
-        players[3].y = table.y + table.height * 0.15;
+        players[3].y = table.y + table.height * 0.06;
 
         // Position ball
         ball.x = players[gameState.currentServer].x;
@@ -298,10 +298,11 @@
         // ball.vx *= 0.95; // Stronger friction
         // ball.vy *= 0.95;
 
-        // If the ball leaves the table on any side, score a point
+        // If the ball leaves the canvas on any side (with margin), score a point
+        const margin = 20;
         if (
-          ball.x < table.x ||
-          ball.x > table.x + table.width ||
+          ball.x < margin ||
+          ball.x > canvas.width - margin ||
           ball.y < table.y ||
           ball.y > table.y + table.height
         ) {
@@ -504,6 +505,7 @@
 
       function updatePlayers() {
         // User movement
+        const margin = 0;
         players[0].x += (players[0].targetX - players[0].x) * 0.2;
         // AI teammate (player 1)
         if (ballStuck && stuckPlayer === 0) {
@@ -513,8 +515,8 @@
           if (allowedHitter === 1 && ball.y > table.netY) {
             // It's their turn, move toward ball
             players[1].targetX = Math.max(
-              table.x,
-              Math.min(table.x + table.width, ball.x)
+              margin,
+              Math.min(canvas.width - margin, ball.x)
             );
           } else {
             // Default position
@@ -564,19 +566,19 @@
           const serveSpots = [
             {
               x: table.x + table.width * 0.3,
-              y: table.y + table.height * 0.85,
+              y: table.y + table.height * 0.94,
             },
             {
               x: table.x + table.width * 0.7,
-              y: table.y + table.height * 0.85,
+              y: table.y + table.height * 0.94,
             },
             {
               x: table.x + table.width * 0.3,
-              y: table.y + table.height * 0.15,
+              y: table.y + table.height * 0.06,
             },
             {
               x: table.x + table.width * 0.7,
-              y: table.y + table.height * 0.15,
+              y: table.y + table.height * 0.06,
             },
           ];
           const server = gameState.currentServer;
@@ -648,11 +650,12 @@
           }
           return;
         }
-        // Always allow user to move horizontally on their side (except before serve)
+        // Only allow user to move on click/tap (not mousemove)
+        const margin = 0;
         if (pos.y > table.netY) {
           players[0].targetX = Math.max(
-            table.x,
-            Math.min(table.x + table.width, pos.x)
+            margin,
+            Math.min(canvas.width - margin, pos.x)
           );
         }
       }
@@ -664,12 +667,7 @@
           if (!gameState.ballInPlay && allowedHitter === 0) {
             return;
           }
-          if (pos.y > table.netY) {
-            players[0].targetX = Math.max(
-              table.x,
-              Math.min(table.x + table.width, pos.x)
-            );
-          }
+          // Do NOT move player on mousemove/touchmove anymore
           return;
         }
         e.preventDefault();
@@ -808,10 +806,10 @@
       // Event listeners for both touch and mouse
       canvas.addEventListener("touchstart", handleInputStart);
       canvas.addEventListener("touchmove", handleInputMove);
-      canvas.addEventListener("touchend", handleInputEnd);
+      window.addEventListener("touchend", handleInputEnd);
       canvas.addEventListener("mousedown", handleInputStart);
       canvas.addEventListener("mousemove", handleInputMove);
-      canvas.addEventListener("mouseup", handleInputEnd);
+      window.addEventListener("mouseup", handleInputEnd);
 
       // Prevent context menu on right click
       canvas.addEventListener("contextmenu", (e) => e.preventDefault());
