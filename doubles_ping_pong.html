@@ -117,15 +117,19 @@
       let ballStuck = false;
       let stuckPlayer = null;
       // Add at the top, after input handling
-      let aiPower = 0; // Current AI power for UI
-      let aiPowerTimeout = null;
-      let showingAIPower = false;
-      let currentPowerOwner = null; // 'user' or 'ai'
+      let aiPlacement = 0; // Current AI placement for UI
+      let aiPlacementTimeout = null;
+      let showingAIPlacement = false;
+      let currentPlacementOwner = null; // 'user' or 'ai'
       let aiCharging = false; // AI is preparing to hit
       let aiWaitingForBallToLeave = false; // Prevents retriggering AI charge until ball leaves zone
       let aiChargingPlayer = null; // Which AI is charging (2 or 3)
       let ballStuckToAI = false;
       let lastAIHitter = null; // Track last AI who hit
+      // Bounce ping animation state
+      let bouncePing = null; // {x, y, time, color}
+      let bounceState = null; // {y, shown, color}
+      let teammatePlacement = 0;
 
       // Game objects - initialize with default values
       let table = {
@@ -222,6 +226,32 @@
         ctx.lineTo(table.x + table.width / 2, table.y + table.height);
         ctx.stroke();
         ctx.setLineDash([]);
+
+        // Draw bounce ping animation if active
+        if (bouncePing) {
+          const elapsed = performance.now() - bouncePing.time;
+          if (elapsed < 900) {
+            const maxRadius = 54;
+            const minRadius = 20;
+            const radius =
+              minRadius + (maxRadius - minRadius) * (elapsed / 900);
+            ctx.save();
+            ctx.globalAlpha = 0.5 * (1 - elapsed / 900) + 0.3;
+            ctx.beginPath();
+            ctx.arc(bouncePing.x, bouncePing.y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = (bouncePing.color || "#fff") + "4D"; // semi-transparent fill
+            ctx.fill();
+            ctx.globalAlpha = 1 - elapsed / 900;
+            ctx.lineWidth = 5;
+            ctx.strokeStyle = bouncePing.color || "#fff";
+            ctx.shadowColor = bouncePing.color || "#fff";
+            ctx.shadowBlur = 18;
+            ctx.stroke();
+            ctx.restore();
+          } else {
+            bouncePing = null;
+          }
+        }
       }
 
       function drawPlayers() {
@@ -317,45 +347,68 @@
             (ball.x - player.x) ** 2 + (ball.y - player.y) ** 2
           );
           if (dist < (player.isUser ? ball.radius + 18 : 40)) {
-            // AI charging and power meter logic for all AI players
-            if (!player.isUser && !aiCharging && !aiWaitingForBallToLeave) {
+            // Before setting a new bounceState, show the previous one if not yet shown
+            if (bounceState && !bounceState.shown) {
+              bouncePing = {
+                x: ball.x,
+                y: ball.y,
+                time: performance.now(),
+                color: bounceState.color,
+              };
+              bounceState.shown = true;
+            }
+            // For AI teammates and opponents (players 1, 2, 3)
+            if (!player.isUser && !aiCharging && aiChargingPlayer === null) {
               aiCharging = true;
               aiChargingPlayer = i;
-              ballStuckToAI = true;
-              // Randomize AI power
               let rand = Math.random();
+              let placement;
               if (rand < 0.85) {
-                aiPower = 0.5 + Math.random() * 0.4; // 0.5-0.9
+                placement = 0.5 + Math.random() * 0.4; // 0.5-0.9
               } else {
-                aiPower =
+                placement =
                   Math.random() < 0.5
                     ? 0.2 + Math.random() * 0.28
                     : 0.91 + Math.random() * 0.09;
               }
-              // Show AI power in power meter UI
-              showingAIPower = true;
-              currentPowerOwner = "ai";
+              if (i === 1) teammatePlacement = placement;
+              else aiPlacement = placement;
+              showingAIPlacement = true;
+              currentPlacementOwner = "ai";
               powerFill.style.background =
                 "linear-gradient(to top, #44aaff, #88e0ff)"; // blue for AI
-              powerFill.style.height = Math.round(aiPower * 100) + "%";
-              if (aiPowerTimeout) clearTimeout(aiPowerTimeout);
-              aiPowerTimeout = setTimeout(() => {
-                // After charging, perform the hit and alternation
-                let targetX = players[0].x;
-                if (
-                  Math.abs(players[0].x - table.x) <
-                  Math.abs(players[1].x - table.x)
-                ) {
-                  targetX = table.x + table.width * 0.7; // Aim for open space
-                }
-                const angle = Math.atan2(
-                  players[0].y - ball.y,
-                  targetX - ball.x
+              powerFill.style.height = Math.round(placement * 100) + "%";
+              ballStuckToAI = true;
+              setTimeout(() => {
+                // AI hit logic
+                const fixedHitSpeed = 4; // Always fixed speed
+                let angle = (Math.random() - 0.5) * 0.6; // random angle
+                let vx = Math.sin(angle) * Math.abs(fixedHitSpeed);
+                let vy = Math.cos(angle) * fixedHitSpeed * (i < 2 ? -1 : 1);
+                ball.vx = vx;
+                ball.vy = vy;
+                ballStuckToAI = false;
+                aiChargingPlayer = null;
+                aiCharging = false;
+                showingAIPlacement = false;
+                currentPlacementOwner = null;
+                powerFill.style.height = "0%";
+                // Set bounceState for indicator
+                const bounce = getBounceLocation(
+                  player.x,
+                  player.y,
+                  placement,
+                  i < 2,
+                  vx,
+                  vy
                 );
-                const fixedSpeed = 4;
-                ball.vx = Math.cos(angle) * fixedSpeed;
-                ball.vy = Math.sin(angle) * fixedSpeed;
-                // Alternation logic for AI
+                bounceState = {
+                  x: bounce.x,
+                  y: bounce.y,
+                  shown: false,
+                  color: i < 2 ? "#2196F3" : "#E91E63",
+                };
+                // Alternation logic (advance to next hitter)
                 let nextTeam, nextHitter;
                 if (i < 2) {
                   // Team 1 hit, so Team 2's turn
@@ -369,19 +422,8 @@
                   lastHitter[1] = i;
                 }
                 allowedHitter = nextHitter;
-                // Hide power meter
-                powerFill.style.height = "0%";
-                showingAIPower = false;
-                currentPowerOwner = null;
-                powerFill.style.background =
-                  "linear-gradient(to top, #ff4444, #ffff44, #44ff44)"; // reset to user color
-                aiCharging = false;
-                aiWaitingForBallToLeave = true;
-                aiChargingPlayer = null;
-                ballStuckToAI = false;
-                lastAIHitter = i;
-              }, 450); // Decreased delay for more fluid AI hits
-              return; // Don't process hit/alternation until after charging
+              }, 400 + Math.random() * 400);
+              return;
             }
             // If AI is charging, don't process hit/alternation
             if (!player.isUser && aiCharging) return;
@@ -404,6 +446,34 @@
             const fixedHitSpeed = 4; // Same as serve speed for consistency
             ball.vx = Math.cos(angle) * fixedHitSpeed;
             ball.vy = Math.sin(angle) * fixedHitSpeed;
+            if (i === 1) {
+              // Randomize teammate placement like AI
+              let rand = Math.random();
+              if (rand < 0.85) {
+                teammatePlacement = 0.5 + Math.random() * 0.4; // 0.5-0.9
+              } else {
+                teammatePlacement =
+                  Math.random() < 0.5
+                    ? 0.2 + Math.random() * 0.28
+                    : 0.91 + Math.random() * 0.09;
+              }
+              // Set bounceState for teammate (do NOT show indicator here)
+              const bounce = getBounceLocation(
+                player.x,
+                player.y,
+                teammatePlacement,
+                false,
+                ball.vx,
+                ball.vy
+              );
+              bounceState = {
+                x: bounce.x,
+                y: bounce.y,
+                shown: false,
+                color: "#2196F3", // blue for team 1
+              };
+              // Do NOT trigger bouncePing here; let updateBall handle it
+            }
           }
         });
         // After players.forEach, reset aiWaitingForBallToLeave only if the ball is far from all AI paddles
@@ -429,7 +499,6 @@
           );
           if (dist < ball.radius + 30) {
             // Increased stick distance
-            console.log("Stick-and-hit triggered: ball stuck to player 0");
             ballStuck = true;
             stuckPlayer = 0;
             charging = false;
@@ -450,6 +519,23 @@
           ball.x = players[aiChargingPlayer].x;
           ball.y = players[aiChargingPlayer].y + 20; // stick below AI paddle
           return;
+        }
+
+        // At the end of updateBall, after all ball movement and before paddle collision logic:
+        if (bounceState && !bounceState.shown) {
+          // For user shot, ball moves upward (vy < 0), for AI shot, downward (vy > 0)
+          if (
+            (ball.vy < 0 && ball.y <= bounceState.y) ||
+            (ball.vy > 0 && ball.y >= bounceState.y)
+          ) {
+            bouncePing = {
+              x: bounceState.x,
+              y: bounceState.y,
+              time: performance.now(),
+              color: bounceState.color,
+            };
+            bounceState.shown = true;
+          }
         }
       }
 
@@ -481,14 +567,15 @@
       }
 
       function updateAI() {
-        // Only move the allowedHitter AI toward the predicted landing spot
+        // Allow AI opponents to move further outside the table
+        const margin = -canvas.width * 0.3;
         [2, 3].forEach((i) => {
           const player = players[i];
           if (i === allowedHitter) {
             // Predict where the ball will cross their y
             const predictedX = Math.max(
-              table.x,
-              Math.min(table.x + table.width, predictBallLandingX())
+              margin,
+              Math.min(canvas.width - margin, predictBallLandingX())
             );
             player.targetX = predictedX;
           } else {
@@ -505,7 +592,7 @@
 
       function updatePlayers() {
         // User movement
-        const margin = 0;
+        const margin = -canvas.width * 0.3;
         players[0].x += (players[0].targetX - players[0].x) * 0.2;
         // AI teammate (player 1)
         if (ballStuck && stuckPlayer === 0) {
@@ -651,7 +738,7 @@
           return;
         }
         // Only allow user to move on click/tap (not mousemove)
-        const margin = 0;
+        const margin = -canvas.width * 0.3;
         if (pos.y > table.netY) {
           players[0].targetX = Math.max(
             margin,
@@ -684,8 +771,8 @@
         // Block user power meter updates if AI is charging
         if (
           aiCharging ||
-          showingAIPower ||
-          (currentPowerOwner && currentPowerOwner !== "user")
+          showingAIPlacement ||
+          (currentPlacementOwner && currentPlacementOwner !== "user")
         )
           return;
 
@@ -696,7 +783,7 @@
           const distance = Math.sqrt(dx * dx + dy * dy);
           chargePower = Math.min(distance / 100, 1);
           aimAngle = Math.atan2(dy, dx);
-          currentPowerOwner = "user";
+          currentPlacementOwner = "user";
           powerFill.style.background =
             "linear-gradient(to top, #ff4444, #ffff44, #44ff44)";
           powerFill.style.height = chargePower * 100 + "%";
@@ -720,7 +807,7 @@
           aimAngle = Math.atan2(dy, dx);
 
           // Update power meter
-          currentPowerOwner = "user";
+          currentPlacementOwner = "user";
           powerFill.style.background =
             "linear-gradient(to top, #ff4444, #ffff44, #44ff44)";
           powerFill.style.height = chargePower * 100 + "%";
@@ -746,12 +833,12 @@
         ) {
           charging = false;
           if (
-            !showingAIPower &&
-            (!currentPowerOwner || currentPowerOwner === "user")
+            !showingAIPlacement &&
+            (!currentPlacementOwner || currentPlacementOwner === "user")
           ) {
             aimArrow.style.display = "none";
             powerFill.style.height = "0%";
-            currentPowerOwner = null;
+            currentPlacementOwner = null;
           }
           return;
         }
@@ -760,11 +847,11 @@
           charging = false;
           aimArrow.style.display = "none";
           if (
-            !showingAIPower &&
-            (!currentPowerOwner || currentPowerOwner === "user")
+            !showingAIPlacement &&
+            (!currentPlacementOwner || currentPlacementOwner === "user")
           ) {
             powerFill.style.height = "0%";
-            currentPowerOwner = null;
+            currentPlacementOwner = null;
           }
           // Hit the ball
           const fixedSpeed = 4;
@@ -772,6 +859,21 @@
           ball.vy = Math.sin(aimAngle) * fixedSpeed;
           ballStuck = false;
           stuckPlayer = null;
+          // Set bounce state for user shot
+          const bounce = getBounceLocation(
+            players[0].x,
+            players[0].y,
+            chargePower,
+            true,
+            ball.vx,
+            ball.vy
+          );
+          bounceState = {
+            x: bounce.x,
+            y: bounce.y,
+            shown: false,
+            color: "#fff",
+          };
           return;
         }
         if (!charging) return;
@@ -779,11 +881,11 @@
         charging = false;
         aimArrow.style.display = "none";
         if (
-          !showingAIPower &&
-          (!currentPowerOwner || currentPowerOwner === "user")
+          !showingAIPlacement &&
+          (!currentPlacementOwner || currentPlacementOwner === "user")
         ) {
           powerFill.style.height = "0%";
-          currentPowerOwner = null;
+          currentPlacementOwner = null;
         }
 
         if (chargePower > 0.1) {
@@ -800,7 +902,56 @@
             allowedHitter = diagonal[gameState.currentServer];
             gameState.currentHitter = allowedHitter;
           }
+          // Set bounce state for user serve
+          const bounce = getBounceLocation(
+            players[0].x,
+            players[0].y,
+            chargePower,
+            true,
+            ball.vx,
+            ball.vy
+          );
+          bounceState = {
+            x: bounce.x,
+            y: bounce.y,
+            shown: false,
+            color: "#fff",
+          };
         }
+      }
+
+      // Add this helper function at the top level, after other helpers
+      function getBounceLocation(
+        fromX,
+        fromY,
+        placement,
+        isUser,
+        vx = 0,
+        vy = 0
+      ) {
+        // Linear interpolation from hitter's paddle to far end line
+        let startY = fromY;
+        let endY = isUser ? table.y : table.y + table.height;
+        // Clamp placement between 0 and 1
+        placement = Math.max(0, Math.min(1, placement));
+        // Bounce location is a linear interpolation
+        const targetY = startY + (endY - startY) * placement;
+
+        // Calculate the predicted x-coordinate where the ball will land
+        // This is a simplified prediction based on current velocity and placement
+        // A more accurate prediction would involve physics simulation
+        let predictedX = fromX;
+        if (vy !== 0) {
+          // Predict where the ball will cross the targetY line
+          const t = (targetY - fromY) / vy;
+          predictedX = fromX + vx * t;
+        } else {
+          // If vy is 0, the ball is moving horizontally.
+          // The bounce will happen at the targetY line.
+          predictedX = fromX;
+        }
+
+        return { x: predictedX, y: targetY };
       }
 
       // Event listeners for both touch and mouse
