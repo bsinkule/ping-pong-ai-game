@@ -1,0 +1,22 @@
+{
+  "name": "doubles-ping-pong-game",
+  "version": "1.0.0",
+  "description": "A 2D doubles ping pong game with touch and mouse controls",
+  "main": "doubles_ping_pong.html",
+  "scripts": {
+    "dev": "live-server --port=3000 --open=/doubles_ping_pong.html --watch=.",
+    "serve": "python3 -m http.server 8000",
+    "serve-python2": "python -m SimpleHTTPServer 8000"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  },
+  "keywords": [
+    "game",
+    "ping-pong",
+    "html5",
+    "canvas"
+  ],
+  "author": "",
+  "license": "MIT"
+}
