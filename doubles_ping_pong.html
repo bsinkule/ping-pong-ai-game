@@ -116,6 +116,16 @@
       let allowedHitter = 0; // index of player allowed to hit next
       let ballStuck = false;
       let stuckPlayer = null;
+      // Add at the top, after input handling
+      let aiPower = 0; // Current AI power for UI
+      let aiPowerTimeout = null;
+      let showingAIPower = false;
+      let currentPowerOwner = null; // 'user' or 'ai'
+      let aiCharging = false; // AI is preparing to hit
+      let aiWaitingForBallToLeave = false; // Prevents retriggering AI charge until ball leaves zone
+      let aiChargingPlayer = null; // Which AI is charging (2 or 3)
+      let ballStuckToAI = false;
+      let lastAIHitter = null; // Track last AI who hit
 
       // Game objects - initialize with default values
       let table = {
@@ -305,8 +315,76 @@
           const dist = Math.sqrt(
             (ball.x - player.x) ** 2 + (ball.y - player.y) ** 2
           );
-          if (dist < ball.radius + 18) {
-            // Correct alternation: after a hit, only the teammate of the opposite team can hit next
+          if (dist < (player.isUser ? ball.radius + 18 : 40)) {
+            // AI charging and power meter logic for all AI players
+            if (!player.isUser && !aiCharging && !aiWaitingForBallToLeave) {
+              aiCharging = true;
+              aiChargingPlayer = i;
+              ballStuckToAI = true;
+              // Randomize AI power
+              let rand = Math.random();
+              if (rand < 0.85) {
+                aiPower = 0.5 + Math.random() * 0.4; // 0.5-0.9
+              } else {
+                aiPower =
+                  Math.random() < 0.5
+                    ? 0.2 + Math.random() * 0.28
+                    : 0.91 + Math.random() * 0.09;
+              }
+              // Show AI power in power meter UI
+              showingAIPower = true;
+              currentPowerOwner = "ai";
+              powerFill.style.background =
+                "linear-gradient(to top, #44aaff, #88e0ff)"; // blue for AI
+              powerFill.style.height = Math.round(aiPower * 100) + "%";
+              if (aiPowerTimeout) clearTimeout(aiPowerTimeout);
+              aiPowerTimeout = setTimeout(() => {
+                // After charging, perform the hit and alternation
+                let targetX = players[0].x;
+                if (
+                  Math.abs(players[0].x - table.x) <
+                  Math.abs(players[1].x - table.x)
+                ) {
+                  targetX = table.x + table.width * 0.7; // Aim for open space
+                }
+                const angle = Math.atan2(
+                  players[0].y - ball.y,
+                  targetX - ball.x
+                );
+                const fixedSpeed = 4;
+                ball.vx = Math.cos(angle) * fixedSpeed;
+                ball.vy = Math.sin(angle) * fixedSpeed;
+                // Alternation logic for AI
+                let nextTeam, nextHitter;
+                if (i < 2) {
+                  // Team 1 hit, so Team 2's turn
+                  nextTeam = [2, 3];
+                  nextHitter = lastHitter[1] === 2 ? 3 : 2;
+                  lastHitter[0] = i;
+                } else {
+                  // Team 2 hit, so Team 1's turn
+                  nextTeam = [0, 1];
+                  nextHitter = lastHitter[0] === 0 ? 1 : 0;
+                  lastHitter[1] = i;
+                }
+                allowedHitter = nextHitter;
+                // Hide power meter
+                powerFill.style.height = "0%";
+                showingAIPower = false;
+                currentPowerOwner = null;
+                powerFill.style.background =
+                  "linear-gradient(to top, #ff4444, #ffff44, #44ff44)"; // reset to user color
+                aiCharging = false;
+                aiWaitingForBallToLeave = true;
+                aiChargingPlayer = null;
+                ballStuckToAI = false;
+                lastAIHitter = i;
+              }, 450); // Decreased delay for more fluid AI hits
+              return; // Don't process hit/alternation until after charging
+            }
+            // If AI is charging, don't process hit/alternation
+            if (!player.isUser && aiCharging) return;
+            // --- Alternation and hit logic for user (or AI if not charging) ---
             let nextTeam, nextHitter;
             if (i < 2) {
               // Team 1 hit, so Team 2's turn
@@ -327,6 +405,22 @@
             ball.vy = Math.sin(angle) * fixedHitSpeed;
           }
         });
+        // After players.forEach, reset aiWaitingForBallToLeave only if the ball is far from all AI paddles
+        if (aiWaitingForBallToLeave) {
+          let allFar = true;
+          for (let j = 0; j < players.length; j++) {
+            if (!players[j].isUser) {
+              const dist = Math.sqrt(
+                (ball.x - players[j].x) ** 2 + (ball.y - players[j].y) ** 2
+              );
+              if (dist < 44) {
+                allFar = false;
+                break;
+              }
+            }
+          }
+          if (allFar) aiWaitingForBallToLeave = false;
+        }
 
         if (!gameState.isServe && allowedHitter === 0 && !ballStuck) {
           const dist = Math.sqrt(
@@ -348,6 +442,12 @@
         if (ballStuck && stuckPlayer === 0) {
           ball.x = players[0].x;
           ball.y = players[0].y - 20;
+          return;
+        }
+        // While ballStuckToAI, make the ball follow the AI charging player
+        if (ballStuckToAI && aiChargingPlayer !== null) {
+          ball.x = players[aiChargingPlayer].x;
+          ball.y = players[aiChargingPlayer].y + 20; // stick below AI paddle
           return;
         }
       }
@@ -398,30 +498,9 @@
         });
       }
 
-      // In updateBall, only allow allowedHitter AI to hit the ball
-      [2, 3].forEach((i) => {
-        if (i === allowedHitter) {
-          const player = players[i];
-          const dist = Math.sqrt(
-            (ball.x - player.x) ** 2 + (ball.y - player.y) ** 2
-          );
-          if (dist < ball.radius + 18) {
-            // AI hits the ball
-            // Aim toward human player or open space
-            let targetX = players[0].x;
-            if (
-              Math.abs(players[0].x - table.x) <
-              Math.abs(players[1].x - table.x)
-            ) {
-              targetX = table.x + table.width * 0.7; // Aim for open space
-            }
-            const angle = Math.atan2(players[0].y - ball.y, targetX - ball.x);
-            const fixedSpeed = 4;
-            ball.vx = Math.cos(angle) * fixedSpeed;
-            ball.vy = Math.sin(angle) * fixedSpeed;
-          }
-        }
-      });
+      // Replace AI hit logic in updateBall with robust AI charging/hit gating
+      // The AI charging and power meter logic is now handled within the players.forEach loop
+      // The alternation and hit logic is also handled within the players.forEach loop
 
       function updatePlayers() {
         // User movement
@@ -543,7 +622,17 @@
       }
 
       function handleInputMove(e) {
-        if (!charging) return;
+        if (!charging) {
+          // Allow user to move horizontally even if not charging, but don't update power meter if AI is charging
+          const pos = getInputPosition(e);
+          if (pos.y > table.netY) {
+            players[0].targetX = Math.max(
+              table.x,
+              Math.min(table.x + table.width, pos.x)
+            );
+          }
+          return;
+        }
         e.preventDefault();
 
         // Only allow aiming if serve or ball is stuck to user
@@ -555,6 +644,13 @@
         ) {
           return;
         }
+        // Block user power meter updates if AI is charging
+        if (
+          aiCharging ||
+          showingAIPower ||
+          (currentPowerOwner && currentPowerOwner !== "user")
+        )
+          return;
 
         if (ballStuck && stuckPlayer === 0 && charging) {
           const pos = getInputPosition(e);
@@ -563,6 +659,9 @@
           const distance = Math.sqrt(dx * dx + dy * dy);
           chargePower = Math.min(distance / 100, 1);
           aimAngle = Math.atan2(dy, dx);
+          currentPowerOwner = "user";
+          powerFill.style.background =
+            "linear-gradient(to top, #ff4444, #ffff44, #44ff44)";
           powerFill.style.height = chargePower * 100 + "%";
           const player = players[0];
           const arrowLength = 40 + chargePower * 60;
@@ -584,6 +683,9 @@
           aimAngle = Math.atan2(dy, dx);
 
           // Update power meter
+          currentPowerOwner = "user";
+          powerFill.style.background =
+            "linear-gradient(to top, #ff4444, #ffff44, #44ff44)";
           powerFill.style.height = chargePower * 100 + "%";
 
           // Update aim arrow
@@ -606,15 +708,27 @@
           )
         ) {
           charging = false;
-          aimArrow.style.display = "none";
-          powerFill.style.height = "0%";
+          if (
+            !showingAIPower &&
+            (!currentPowerOwner || currentPowerOwner === "user")
+          ) {
+            aimArrow.style.display = "none";
+            powerFill.style.height = "0%";
+            currentPowerOwner = null;
+          }
           return;
         }
 
         if (ballStuck && stuckPlayer === 0 && charging) {
           charging = false;
           aimArrow.style.display = "none";
-          powerFill.style.height = "0%";
+          if (
+            !showingAIPower &&
+            (!currentPowerOwner || currentPowerOwner === "user")
+          ) {
+            powerFill.style.height = "0%";
+            currentPowerOwner = null;
+          }
           // Hit the ball
           const fixedSpeed = 4;
           ball.vx = Math.cos(aimAngle) * fixedSpeed;
@@ -627,7 +741,13 @@
         e.preventDefault();
         charging = false;
         aimArrow.style.display = "none";
-        powerFill.style.height = "0%";
+        if (
+          !showingAIPower &&
+          (!currentPowerOwner || currentPowerOwner === "user")
+        ) {
+          powerFill.style.height = "0%";
+          currentPowerOwner = null;
+        }
 
         if (chargePower > 0.1) {
           // Serve or hit the ball
