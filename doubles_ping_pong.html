@@ -558,10 +558,42 @@
           gameState.currentServer + 1
         }`;
 
-        // Reset ball position
+        // Reset player and ball position for serve
         setTimeout(() => {
-          ball.x = players[gameState.currentServer].x;
-          ball.y = players[gameState.currentServer].y - 50; // Start further from player
+          // Designated serve spots (same as in resizeCanvas)
+          const serveSpots = [
+            {
+              x: table.x + table.width * 0.3,
+              y: table.y + table.height * 0.85,
+            },
+            {
+              x: table.x + table.width * 0.7,
+              y: table.y + table.height * 0.85,
+            },
+            {
+              x: table.x + table.width * 0.3,
+              y: table.y + table.height * 0.15,
+            },
+            {
+              x: table.x + table.width * 0.7,
+              y: table.y + table.height * 0.15,
+            },
+          ];
+          const server = gameState.currentServer;
+          players[server].x = players[server].targetX = serveSpots[server].x;
+          players[server].y = serveSpots[server].y;
+          // For user, also lock their teammate to default spot
+          if (server === 0) {
+            players[1].x = players[1].targetX = serveSpots[1].x;
+            players[1].y = serveSpots[1].y;
+          }
+          // For AI, also lock their teammate to default spot
+          if (server === 2) {
+            players[3].x = players[3].targetX = serveSpots[3].x;
+            players[3].y = serveSpots[3].y;
+          }
+          ball.x = players[server].x;
+          ball.y = players[server].y - 50; // Start further from player
           ball.vx = 0;
           ball.vy = 0;
 
@@ -605,26 +637,33 @@
           aimArrow.style.display = "block";
           return;
         }
-        // Always allow user to move horizontally on their side
+        // Prevent user movement before serve if user is server
+        if (!gameState.ballInPlay && allowedHitter === 0) {
+          // Only allow charging for serve, not movement
+          if (!charging) {
+            inputStart = pos;
+            charging = true;
+            chargePower = 0;
+            aimArrow.style.display = "block";
+          }
+          return;
+        }
+        // Always allow user to move horizontally on their side (except before serve)
         if (pos.y > table.netY) {
           players[0].targetX = Math.max(
             table.x,
             Math.min(table.x + table.width, pos.x)
           );
         }
-        // Only allow charging for serve, not for regular rally
-        if (!gameState.ballInPlay && allowedHitter === 0 && !charging) {
-          inputStart = pos;
-          charging = true;
-          chargePower = 0;
-          aimArrow.style.display = "block";
-        }
       }
 
       function handleInputMove(e) {
         if (!charging) {
-          // Allow user to move horizontally even if not charging, but don't update power meter if AI is charging
+          // Prevent user movement before serve if user is server
           const pos = getInputPosition(e);
+          if (!gameState.ballInPlay && allowedHitter === 0) {
+            return;
+          }
           if (pos.y > table.netY) {
             players[0].targetX = Math.max(
               table.x,
