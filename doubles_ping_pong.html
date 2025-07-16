@@ -130,6 +130,8 @@
       let bouncePing = null; // {x, y, time, color}
       let bounceState = null; // {y, shown, color}
       let teammatePlacement = 0;
+      let hasBounced = false;
+      let hasBouncedIn = false;
 
       // Game objects - initialize with default values
       let table = {
@@ -347,6 +349,19 @@
             (ball.x - player.x) ** 2 + (ball.y - player.y) ** 2
           );
           if (dist < (player.isUser ? ball.radius + 18 : 40)) {
+            // --- Out on volley wide ---
+            // If the ball is outside the table width and has not bounced, count as out
+            const left = table.x;
+            const right = table.x + table.width;
+            if (!hasBouncedIn && (ball.x < left || ball.x > right)) {
+              // Determine which team hit last using lastHitter
+              let lastHitterIdx =
+                allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
+              let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+              let opponentTeam = hitterTeam === 1 ? 2 : 1;
+              scorePoint(opponentTeam);
+              return;
+            }
             // Before setting a new bounceState, show the previous one if not yet shown
             if (bounceState && !bounceState.shown) {
               bouncePing = {
@@ -528,6 +543,7 @@
             (ball.vy < 0 && ball.y <= bounceState.y) ||
             (ball.vy > 0 && ball.y >= bounceState.y)
           ) {
+            hasBounced = false; // Reset after every bounce so next volley is checked for being wide
             bouncePing = {
               x: bounceState.x,
               y: bounceState.y,
@@ -535,6 +551,44 @@
               color: bounceState.color,
             };
             bounceState.shown = true;
+            // --- Bounce-based out detection ---
+            // Determine which team should receive the bounce (who is the opponent?)
+            // If last hitter was team 1 (player 0 or 1), bounce must be on team 2's side (top half)
+            // If last hitter was team 2 (player 2 or 3), bounce must be on team 1's side (bottom half)
+            let lastHitterIdx =
+              allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
+            let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+            let opponentTeam = hitterTeam === 1 ? 2 : 1;
+            // Table bounds
+            const left = table.x;
+            const right = table.x + table.width;
+            const top = table.y;
+            const bottom = table.y + table.height;
+            // Ball must land on opponent's half (including lines)
+            let inBounds = false;
+            if (hitterTeam === 1) {
+              // Ball must land on top half (team 2's side)
+              inBounds =
+                bouncePing.x >= left &&
+                bouncePing.x <= right &&
+                bouncePing.y >= top &&
+                bouncePing.y <= table.netY;
+            } else {
+              // Ball must land on bottom half (team 1's side)
+              inBounds =
+                bouncePing.x >= left &&
+                bouncePing.x <= right &&
+                bouncePing.y >= table.netY &&
+                bouncePing.y <= bottom;
+            }
+            if (!inBounds) {
+              // Ball is out, award point to opponent
+              scorePoint(opponentTeam);
+              return;
+            } else {
+              hasBouncedIn = true; // Only set true if bounce was in
+            }
+            // --- End bounce-based out detection ---
           }
         }
       }
@@ -698,6 +752,8 @@
         allowedHitter = gameState.currentServer;
         ballStuck = false;
         stuckPlayer = null;
+        hasBounced = false;
+        hasBouncedIn = false;
       }
 
       function getInputPosition(e) {
@@ -874,6 +930,7 @@
             shown: false,
             color: "#fff",
           };
+          hasBouncedIn = false;
           return;
         }
         if (!charging) return;
