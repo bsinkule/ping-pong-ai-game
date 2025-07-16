@@ -164,6 +164,10 @@
       let chargePower = 0;
       let aimAngle = 0;
 
+      // At the top, define the serve rotation order:
+      const serveRotation = [0, 3, 1, 2]; // Player indices: 1, 4, 2, 3
+      let serveRotationIndex = 0;
+
       function resizeCanvas() {
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
@@ -692,14 +696,15 @@
         // Next serve
         gameState.servesLeft--;
         if (gameState.servesLeft <= 0) {
-          gameState.currentServer = (gameState.currentServer + 1) % 4;
+          serveRotationIndex = (serveRotationIndex + 1) % serveRotation.length;
+          gameState.currentServer = serveRotation[serveRotationIndex];
           gameState.servesLeft = 5;
         }
 
         gameState.currentHitter = gameState.currentServer;
         document.getElementById("gameInfo").textContent = `Serving: Player ${
           gameState.currentServer + 1
-        }`;
+        } (Serves left: ${gameState.servesLeft})`;
 
         // Reset player and ball position for serve
         setTimeout(() => {
@@ -736,9 +741,77 @@
             players[3].y = serveSpots[3].y;
           }
           ball.x = players[server].x;
-          ball.y = players[server].y - 50; // Start further from player
+          // Place ball in front of server (above for top, below for bottom)
+          if (server === 0 || server === 1) {
+            ball.y = players[server].y - 50;
+          } else {
+            ball.y = players[server].y + 50;
+          }
           ball.vx = 0;
           ball.vy = 0;
+
+          // If the server is an AI, trigger AI serve after a short delay
+          if (server !== 0) {
+            setTimeout(() => {
+              // Simulate AI serve: random angle and placement
+              let placement;
+              let rand = Math.random();
+              if (rand < 0.85) {
+                placement = 0.5 + Math.random() * 0.4; // 0.5-0.9
+              } else {
+                placement =
+                  Math.random() < 0.5
+                    ? 0.2 + Math.random() * 0.28
+                    : 0.91 + Math.random() * 0.09;
+              }
+              const fixedSpeed = 4;
+              // For top servers, serve downward; for bottom, serve upward
+              let angle = (Math.random() - 0.5) * 0.6;
+              let vx = Math.sin(angle) * Math.abs(fixedSpeed);
+              let vy =
+                server === 2 || server === 3
+                  ? Math.cos(angle) * fixedSpeed
+                  : -Math.cos(angle) * fixedSpeed;
+              ball.vx = vx;
+              ball.vy = vy;
+              gameState.ballInPlay = true;
+              // After the serve, set allowedHitter to the diagonal opponent
+              const diagonal = [3, 2, 1, 0];
+              allowedHitter = diagonal[server];
+              gameState.currentHitter = allowedHitter;
+              // Set bounce state for AI serve
+              const bounce = getBounceLocation(
+                players[server].x,
+                players[server].y,
+                placement,
+                server === 0 || server === 1,
+                vx,
+                vy
+              );
+              bounceState = {
+                x: bounce.x,
+                y: bounce.y,
+                shown: false,
+                color: "#fff",
+              };
+              hasBouncedIn = false;
+            }, 600);
+          }
+
+          // In serve reset (setTimeout in scorePoint), set allowedHitter = server (not diagonal opponent):
+          allowedHitter = server;
+          gameState.currentHitter = server;
+
+          // Set lastHitter so alternation works after the first return
+          // Team 1: indices 0,1; Team 2: indices 2,3
+          // If server is team 1 (0 or 1), lastHitter = [server, diagonal[server]]
+          // If server is team 2 (2 or 3), lastHitter = [diagonal[server], server]
+          const diagonal = [3, 2, 1, 0];
+          if (server === 0 || server === 1) {
+            lastHitter = [server, diagonal[server]];
+          } else {
+            lastHitter = [diagonal[server], server];
+          }
 
           if (gameState.currentServer === 0) {
             document.getElementById("instructions").textContent =
