@@ -344,16 +344,19 @@
           ball.y < table.y ||
           ball.y > table.y + table.height
         ) {
-          // If the ball has bounced in, award the point to the last hitter's team (they hit a legal shot that was not returned)
           if (hasBouncedIn) {
-            // Determine last hitter
+            // Ball bounced in, point to last hitter's team
             let lastHitterIdx =
               allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
             let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
             scorePoint(hitterTeam);
           } else {
-            // Otherwise, use the old logic (the team that failed to return gets the point)
-            scorePoint(players[gameState.currentHitter].team === 1 ? 2 : 1);
+            // Ball never bounced in, point to opponent of last hitter
+            let lastHitterIdx =
+              allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
+            let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+            let opponentTeam = hitterTeam === 1 ? 2 : 1;
+            scorePoint(opponentTeam);
           }
           return;
         }
@@ -406,7 +409,17 @@
                 allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
               let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
               let opponentTeam = hitterTeam === 1 ? 2 : 1;
-              scorePoint(opponentTeam);
+              // Check if the ball crossed the net (i.e., y is on the opponent's side)
+              if (
+                (hitterTeam === 1 && ball.y <= table.netY) ||
+                (hitterTeam === 2 && ball.y >= table.netY)
+              ) {
+                // Ball crossed the net and went out wide: point to opponent
+                scorePoint(opponentTeam);
+              } else {
+                // Ball did not cross the net: point to opponent (failed shot)
+                scorePoint(opponentTeam);
+              }
               return;
             }
             // Before setting a new bounceState, show the previous one if not yet shown
