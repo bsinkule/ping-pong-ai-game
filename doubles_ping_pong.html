@@ -132,6 +132,8 @@
       let teammatePlacement = 0;
       let hasBounced = false;
       let hasBouncedIn = false;
+      // Add at the top, after other global variables:
+      let isServeInProgress = false;
 
       // Game objects - initialize with default values
       let table = {
@@ -353,6 +355,37 @@
             (ball.x - player.x) ** 2 + (ball.y - player.y) ** 2
           );
           if (dist < (player.isUser ? ball.radius + 18 : 40)) {
+            // --- Diagonal serve enforcement on paddle collision (for full power serves) ---
+            if (isServeInProgress) {
+              const centerX = table.x + table.width / 2;
+              const server = gameState.currentServer;
+              let correctSide = null;
+              // Player 0 and 2: must serve to right half (x > centerX)
+              // Player 1 and 3: must serve to left half (x < centerX)
+              if (server === 0 || server === 2) correctSide = "right";
+              else correctSide = "left";
+              if (
+                (correctSide === "right" && ball.x <= centerX) ||
+                (correctSide === "left" && ball.x >= centerX)
+              ) {
+                // Serve is out, award point to opponent
+                isServeInProgress = false;
+                let opponentTeam = players[server].team === 1 ? 2 : 1;
+                scorePoint(opponentTeam);
+                return;
+              } else if (ball.x < table.x || ball.x > table.x + table.width) {
+                // Serve is wide, out
+                isServeInProgress = false;
+                let opponentTeam = players[server].team === 1 ? 2 : 1;
+                scorePoint(opponentTeam);
+                return;
+              } else {
+                // Serve is in, allow regular gameplay
+                isServeInProgress = false;
+                hasBouncedIn = true;
+                // Do not return; allow normal hit logic to proceed
+              }
+            }
             // --- Out on volley wide ---
             // If the ball is outside the table width and has not bounced, count as out
             const left = table.x;
@@ -555,6 +588,26 @@
               color: bounceState.color,
             };
             bounceState.shown = true;
+            // --- Diagonal serve enforcement (first bounce after serve) ---
+            if (isServeInProgress) {
+              isServeInProgress = false;
+              const centerX = table.x + table.width / 2;
+              const server = gameState.currentServer;
+              let correctSide = null;
+              // Player 0 and 2: must bounce on right half (x > centerX)
+              // Player 1 and 3: must bounce on left half (x < centerX)
+              if (server === 0 || server === 2) correctSide = "right";
+              else correctSide = "left";
+              if (
+                (correctSide === "right" && bouncePing.x <= centerX) ||
+                (correctSide === "left" && bouncePing.x >= centerX)
+              ) {
+                // Serve is out, award point to opponent
+                let opponentTeam = players[server].team === 1 ? 2 : 1;
+                scorePoint(opponentTeam);
+                return;
+              }
+            }
             // --- Bounce-based out detection ---
             // Determine which team should receive the bounce (who is the opponent?)
             // If last hitter was team 1 (player 0 or 1), bounce must be on team 2's side (top half)
@@ -753,25 +806,49 @@
           // If the server is an AI, trigger AI serve after a short delay
           if (server !== 0) {
             setTimeout(() => {
-              // Simulate AI serve: random angle and placement
+              // AI serve: 85-90% chance of going in on the correct quadrant
               let placement;
               let rand = Math.random();
-              if (rand < 0.85) {
-                placement = 0.5 + Math.random() * 0.4; // 0.5-0.9
+              let targetX;
+              const centerX = table.x + table.width / 2;
+              if (rand < 0.875) {
+                // 87.5% chance: serve in, aim for center of correct quadrant
+                placement = 0.55 + Math.random() * 0.35; // 0.55-0.9
+                // Determine target x for correct quadrant
+                if (server === 0 || server === 2) {
+                  // Right half
+                  targetX =
+                    centerX +
+                    table.width / 4 +
+                    (Math.random() - 0.5) * (table.width / 6);
+                } else {
+                  // Left half
+                  targetX =
+                    centerX -
+                    table.width / 4 +
+                    (Math.random() - 0.5) * (table.width / 6);
+                }
               } else {
+                // 12.5% chance: serve out (either short or long, random side)
                 placement =
                   Math.random() < 0.5
                     ? 0.2 + Math.random() * 0.28
                     : 0.91 + Math.random() * 0.09;
+                // Out serves: aim randomly across the table
+                targetX = table.x + Math.random() * table.width;
               }
+              // Calculate angle to targetX at far end line
+              let fromX = players[server].x;
+              let fromY = players[server].y;
+              let toY =
+                server === 0 || server === 1 ? table.y : table.y + table.height;
+              let toX = targetX;
+              let angle =
+                Math.atan2(toY - fromY, toX - fromX) +
+                (Math.random() - 0.5) * 0.12;
               const fixedSpeed = 4;
-              // For top servers, serve downward; for bottom, serve upward
-              let angle = (Math.random() - 0.5) * 0.6;
-              let vx = Math.sin(angle) * Math.abs(fixedSpeed);
-              let vy =
-                server === 2 || server === 3
-                  ? Math.cos(angle) * fixedSpeed
-                  : -Math.cos(angle) * fixedSpeed;
+              let vx = Math.cos(angle) * fixedSpeed;
+              let vy = Math.sin(angle) * fixedSpeed;
               ball.vx = vx;
               ball.vy = vy;
               gameState.ballInPlay = true;
@@ -827,6 +904,7 @@
         stuckPlayer = null;
         hasBounced = false;
         hasBouncedIn = false;
+        isServeInProgress = true;
       }
 
       function getInputPosition(e) {
@@ -1115,6 +1193,7 @@
       // Initialize and start game
       resizeCanvas();
       window.addEventListener("resize", resizeCanvas);
+      isServeInProgress = true;
       gameLoop();
 
       // Start message
