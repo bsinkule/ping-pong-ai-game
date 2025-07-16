@@ -344,7 +344,17 @@
           ball.y < table.y ||
           ball.y > table.y + table.height
         ) {
-          scorePoint(players[gameState.currentHitter].team === 1 ? 2 : 1);
+          // If the ball has bounced in, award the point to the last hitter's team (they hit a legal shot that was not returned)
+          if (hasBouncedIn) {
+            // Determine last hitter
+            let lastHitterIdx =
+              allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
+            let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+            scorePoint(hitterTeam);
+          } else {
+            // Otherwise, use the old logic (the team that failed to return gets the point)
+            scorePoint(players[gameState.currentHitter].team === 1 ? 2 : 1);
+          }
           return;
         }
 
@@ -639,7 +649,6 @@
                 bouncePing.y <= bottom;
             }
             if (!inBounds) {
-              // Ball is out, award point to opponent
               scorePoint(opponentTeam);
               return;
             } else {
