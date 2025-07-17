@@ -143,6 +143,11 @@
       };
       let hasBouncedSinceLastHit = false;
       let isServeInProgress = false;
+      // Add at the top, after other global variables:
+      // Ball flight arc tracking for net-peak shadow
+      let flightStartY = null;
+      let flightEndY = null;
+      let flightActive = false;
 
       // Game objects - initialize with default values
       let table = {
@@ -321,14 +326,52 @@
           ctx.globalAlpha = 1;
         }
 
-        // Ball
+        // --- Net-peak dynamic shadow and ball height ---
+        let t = 0;
+        if (
+          flightActive &&
+          flightStartY !== null &&
+          flightEndY !== null &&
+          flightStartY !== flightEndY
+        ) {
+          t = (ball.y - flightStartY) / (flightEndY - flightStartY);
+          t = Math.max(0, Math.min(1, t));
+        }
+        // Height: 0 at t=0/1, max at t=0.5 (net)
+        let height = 1 - 4 * Math.pow(t - 0.5, 2);
+        height = Math.max(0, height);
+        let visualHeight = Math.pow(height, 1.7);
+        let shadowAlpha = 0.16 + 0.28 * (1 - visualHeight);
+        let shadowRadiusX = ball.radius * (1.18 - 0.5 * visualHeight);
+        let shadowRadiusY = ball.radius * (0.48 - 0.12 * visualHeight);
+        let shadowYOffset = ball.radius + 3 + 13 * visualHeight;
+        let ballScale = 1 - 0.16 * visualHeight;
+        // Draw shadow
+        ctx.save();
+        ctx.globalAlpha = shadowAlpha;
+        ctx.fillStyle = "#000";
+        ctx.beginPath();
+        ctx.ellipse(
+          ball.x,
+          ball.y + shadowYOffset,
+          shadowRadiusX,
+          shadowRadiusY,
+          0,
+          0,
+          Math.PI * 2
+        );
+        ctx.fill();
+        ctx.restore();
+        // Draw ball
+        ctx.save();
         ctx.fillStyle = "#fff";
         ctx.strokeStyle = "#ccc";
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.arc(ball.x, ball.y, ball.radius * ballScale, 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
+        ctx.restore();
       }
 
       function updateBall() {
@@ -337,6 +380,25 @@
         // Update trail
         ball.trail.push({ x: ball.x, y: ball.y });
         if (ball.trail.length > 10) ball.trail.shift();
+
+        // On hit, record flight start/end Y for net-peak arc
+        if (ballStuck || ballStuckToAI) {
+          flightActive = false;
+          flightStartY = null;
+          flightEndY = null;
+        } else if (
+          !flightActive &&
+          (Math.abs(ball.vx) > 0 || Math.abs(ball.vy) > 0)
+        ) {
+          flightStartY = ball.y;
+          // Use bounceState.y if available, else far end of table
+          if (bounceState && typeof bounceState.y === "number") {
+            flightEndY = bounceState.y;
+          } else {
+            flightEndY = ball.vy < 0 ? table.y : table.y + table.height;
+          }
+          flightActive = true;
+        }
 
         ball.x += ball.vx;
         ball.y += ball.vy;
@@ -633,6 +695,10 @@
             (ball.vy < 0 && ball.y <= bounceState.y) ||
             (ball.vy > 0 && ball.y >= bounceState.y)
           ) {
+            // Ball bounces: reset flight arc
+            flightActive = false;
+            flightStartY = null;
+            flightEndY = null;
             hasBounced = false; // Reset after every bounce so next volley is checked for being wide
             bouncePing = {
               x: bounceState.x,
