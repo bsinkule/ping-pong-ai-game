@@ -615,7 +615,13 @@
         // While ballStuckToAI, make the ball follow the AI charging player
         if (ballStuckToAI && aiChargingPlayer !== null) {
           ball.x = players[aiChargingPlayer].x;
-          ball.y = players[aiChargingPlayer].y + 20; // stick below AI paddle
+          // For player[1] (bottom right, UI player 2), stick above paddle (toward net)
+          if (aiChargingPlayer === 1) {
+            ball.y = players[1].y - 20;
+          } else {
+            // For top-side AIs (players 2 and 3), stick below paddle (toward net for their side)
+            ball.y = players[aiChargingPlayer].y + 20;
+          }
           return;
         }
 
