@@ -391,7 +391,10 @@
       function drawPlayers() {
         players.forEach((player, i) => {
           ctx.save();
-          if (i !== allowedHitter) {
+          // If waiting for serve, highlight the server
+          if (!gameState.ballInPlay && i === gameState.currentServer) {
+            ctx.globalAlpha = 1;
+          } else if (i !== allowedHitter) {
             ctx.globalAlpha = 0.3; // Dim everyone except allowedHitter
           } else {
             ctx.globalAlpha = 1;
@@ -923,20 +926,34 @@
       function updateAI() {
         // Allow AI opponents to move further outside the table
         const margin = -canvas.width * 0.3;
+        if (!gameState.ballInPlay) {
+          // Before the serve, both AIs stay at their default positions
+          players[2].targetX = table.x + table.width * 0.3;
+          players[3].targetX = table.x + table.width * 0.7;
+          players[2].x += (players[2].targetX - players[2].x) * 0.15;
+          players[3].x += (players[3].targetX - players[3].x) * 0.15;
+          return;
+        }
+        if (ballStuck && stuckPlayer === 0) {
+          // While user is charging/aiming, both AIs stay where they are
+          return;
+        }
+        if (ballStuckToAI || aiCharging) {
+          // While AI is charging/hitting, both AIs stay where they are
+          return;
+        }
+        // During gameplay, only allowedHitter AI moves to predicted spot, other AI does nothing
         [2, 3].forEach((i) => {
-          const player = players[i];
           if (i === allowedHitter) {
-            // Predict where the ball will cross their y
+            const player = players[i];
             const predictedX = Math.max(
               margin,
               Math.min(canvas.width - margin, predictBallLandingX())
             );
             player.targetX = predictedX;
-          } else {
-            // Default position
-            player.targetX = table.x + table.width * (i === 2 ? 0.3 : 0.7);
+            player.x += (player.targetX - player.x) * 0.15;
           }
-          player.x += (player.targetX - player.x) * 0.15;
+          // The other AI does nothing (stays wherever they are)
         });
       }
 
@@ -1030,18 +1047,19 @@
         const server = gameState.currentServer;
         players[server].x = players[server].targetX = serveSpots[server].x;
         players[server].y = serveSpots[server].y;
-        // For user, also lock their teammate to default spot
-        if (server === 0) {
+        if (server === 0 || server === 1) {
+          players[0].x = players[0].targetX = serveSpots[0].x;
+          players[0].y = serveSpots[0].y;
           players[1].x = players[1].targetX = serveSpots[1].x;
           players[1].y = serveSpots[1].y;
         }
-        // For AI, also lock their teammate to default spot
-        if (server === 2) {
+        if (server === 2 || server === 3) {
+          players[2].x = players[2].targetX = serveSpots[2].x;
+          players[2].y = serveSpots[2].y;
           players[3].x = players[3].targetX = serveSpots[3].x;
           players[3].y = serveSpots[3].y;
         }
         ball.x = players[server].x;
-        // Place ball in front of server (above for bottom, below for top)
         if (server === 0 || server === 1) {
           ball.y = players[server].y - 50;
         } else {
@@ -1052,12 +1070,27 @@
         hasBouncedIn = false;
         hasBouncedSinceLastHit = false;
 
+        // --- Clean alternation logic on serve reset ---
+        const diagonal = [3, 2, 1, 0];
+        if (server === 0) {
+          allowedHitter = 0;
+          gameState.currentHitter = 0;
+        } else {
+          allowedHitter = diagonal[server];
+          gameState.currentHitter = diagonal[server];
+        }
+        // Set lastHitter so alternation works for all four servers
+        if (server < 2) {
+          lastHitter = [server, diagonal[server]];
+        } else {
+          lastHitter = [diagonal[server], server];
+        }
+        // --- END IMMEDIATE SERVE RESET LOGIC ---
+
         // If the server is an AI, trigger AI serve after a short delay
         if (server !== 0) {
           setTimeout(() => {
             // AI serve: 85-90% chance of going in on the correct quadrant
-            lastHitterIndex = server;
-            hasBouncedSinceLastHit = false;
             let placement;
             let rand = Math.random();
             let targetX;
@@ -1106,7 +1139,7 @@
             // After the serve, set allowedHitter to the diagonal opponent
             const diagonal = [3, 2, 1, 0];
             allowedHitter = diagonal[server];
-            gameState.currentHitter = allowedHitter;
+            gameState.currentHitter = diagonal[server];
             // Set bounce state for AI serve
             const bounce = getBounceLocation(
               players[server].x,
@@ -1128,22 +1161,6 @@
           }, 600);
         }
 
-        // In serve reset, set allowedHitter = server (not diagonal opponent):
-        allowedHitter = server;
-        gameState.currentHitter = server;
-
-        // Set lastHitter so alternation works after the first return
-        // Team 1: indices 0,1; Team 2: indices 2,3
-        // If server is team 1 (0 or 1), lastHitter = [server, diagonal[server]]
-        // If server is team 2 (2 or 3), lastHitter = [diagonal[server], server]
-        const diagonal = [3, 2, 1, 0];
-        if (server === 0 || server === 1) {
-          lastHitter = [server, diagonal[server]];
-        } else {
-          lastHitter = [diagonal[server], server];
-        }
-        // --- END IMMEDIATE SERVE RESET LOGIC ---
-
         // After serve reset, show instructions after 2s
         setTimeout(() => {
           if (gameState.currentServer === 0) {
@@ -1154,8 +1171,6 @@
               "Click/tap to move, hold to aim & power";
           }
         }, 2000);
-        lastHitter = [0, 2]; // Reset alternation on point
-        allowedHitter = gameState.currentServer;
         ballStuck = false;
         stuckPlayer = null;
         hasBounced = false;
