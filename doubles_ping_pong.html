@@ -533,6 +533,15 @@
           ball.y < table.y ||
           ball.y > table.y + table.height
         ) {
+          // Special case: after a valid serve, if the returner misses, award point to server's team
+          if (hasBouncedIn && !isServeInProgress) {
+            // Ball was served in, but return was missed
+            let serverTeam = players[gameState.currentServer].team;
+            scorePoint(serverTeam);
+            hasBouncedIn = false;
+            hasBouncedSinceLastHit = false;
+            return;
+          }
           let lastHitterIdx =
             typeof lastHitterIndex !== "undefined"
               ? lastHitterIndex
