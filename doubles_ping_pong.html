@@ -133,6 +133,13 @@
       let hasBounced = false;
       let hasBouncedIn = false;
       // Add at the top, after other global variables:
+      let aimingArrowState = {
+        x: 0,
+        y: 0,
+        angle: 0,
+        length: 0,
+        visible: false,
+      };
       let hasBouncedSinceLastHit = false;
       let isServeInProgress = false;
 
@@ -594,7 +601,7 @@
             stuckPlayer = 0;
             charging = false;
             chargePower = 0;
-            aimArrow.style.display = "none";
+            // aimArrow.style.display = "none"; // Removed
             powerFill.style.height = "0%";
             return;
           }
@@ -985,7 +992,7 @@
           inputStart = pos;
           charging = true;
           chargePower = 0;
-          aimArrow.style.display = "block";
+          // aimArrow.style.display = "block"; // Removed
           return;
         }
         // Prevent user movement before serve if user is server
@@ -995,7 +1002,7 @@
             inputStart = pos;
             charging = true;
             chargePower = 0;
-            aimArrow.style.display = "block";
+            // aimArrow.style.display = "block"; // Removed
           }
           return;
         }
@@ -1051,10 +1058,13 @@
           powerFill.style.height = chargePower * 100 + "%";
           const player = players[0];
           const arrowLength = 40 + chargePower * 60;
-          aimArrow.style.left = player.x - 2 + "px";
-          aimArrow.style.top = player.y - arrowLength + "px";
-          aimArrow.style.height = arrowLength + "px";
-          aimArrow.style.transform = `rotate(${aimAngle - Math.PI / 2}rad)`;
+          aimingArrowState = {
+            x: player.x,
+            y: player.y,
+            angle: aimAngle,
+            length: arrowLength,
+            visible: true,
+          };
           return;
         }
 
@@ -1076,12 +1086,14 @@
 
           // Update aim arrow
           const player = players[0];
-          const arrowLength = 40 + chargePower * 60; // Arrow grows with power
-          aimArrow.style.display = "block";
-          aimArrow.style.left = player.x - 2 + "px";
-          aimArrow.style.top = player.y - arrowLength + "px";
-          aimArrow.style.height = arrowLength + "px";
-          aimArrow.style.transform = `rotate(${aimAngle - Math.PI / 2}rad)`;
+          const arrowLength = 40 + chargePower * 60;
+          aimingArrowState = {
+            x: player.x,
+            y: player.y,
+            angle: aimAngle,
+            length: arrowLength,
+            visible: true,
+          };
         }
       }
 
@@ -1094,25 +1106,26 @@
           )
         ) {
           charging = false;
+          // aimArrow.style.display = "none"; // Removed
           if (
             !showingAIPlacement &&
             (!currentPlacementOwner || currentPlacementOwner === "user")
           ) {
-            aimArrow.style.display = "none";
-            powerFill.style.height = "0%";
+            // powerFill.style.height = "0%"; // Removed
             currentPlacementOwner = null;
           }
+          aimingArrowState.visible = false;
           return;
         }
 
         if (ballStuck && stuckPlayer === 0 && charging) {
           charging = false;
-          aimArrow.style.display = "none";
+          // aimArrow.style.display = "none"; // Removed
           if (
             !showingAIPlacement &&
             (!currentPlacementOwner || currentPlacementOwner === "user")
           ) {
-            powerFill.style.height = "0%";
+            // powerFill.style.height = "0%"; // Removed
             currentPlacementOwner = null;
           }
           // Hit the ball
@@ -1139,19 +1152,21 @@
             color: "#fff",
           };
           hasBouncedIn = false;
+          aimingArrowState.visible = false;
           return;
         }
         if (!charging) return;
         e.preventDefault();
         charging = false;
-        aimArrow.style.display = "none";
+        // aimArrow.style.display = "none"; // Removed
         if (
           !showingAIPlacement &&
           (!currentPlacementOwner || currentPlacementOwner === "user")
         ) {
-          powerFill.style.height = "0%";
+          // powerFill.style.height = "0%"; // Removed
           currentPlacementOwner = null;
         }
+        aimingArrowState.visible = false;
 
         if (chargePower > 0.1) {
           // Serve or hit the ball
@@ -1221,6 +1236,45 @@
         return { x: predictedX, y: targetY };
       }
 
+      // Add this function at the top level, after other helpers:
+      function drawAimingArrow() {
+        if (!aimingArrowState.visible) return;
+        const { x, y, angle, length } = aimingArrowState;
+        ctx.save();
+        ctx.strokeStyle = "rgba(220,220,220,0.7)";
+        ctx.fillStyle = "rgba(220,220,220,0.7)";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
+        // Calculate triangle base and tip
+        const headLength = 14;
+        const headWidth = 10;
+        const tipX = x + Math.cos(angle) * length;
+        const tipY = y + Math.sin(angle) * length;
+        const baseCenterX = tipX - Math.cos(angle) * headLength;
+        const baseCenterY = tipY - Math.sin(angle) * headLength;
+        // Draw main arrow line from player to base center
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(baseCenterX, baseCenterY);
+        ctx.stroke();
+        // Draw triangle arrowhead
+        const leftX =
+          baseCenterX + Math.cos(angle + Math.PI / 2) * (headWidth / 2);
+        const leftY =
+          baseCenterY + Math.sin(angle + Math.PI / 2) * (headWidth / 2);
+        const rightX =
+          baseCenterX + Math.cos(angle - Math.PI / 2) * (headWidth / 2);
+        const rightY =
+          baseCenterY + Math.sin(angle - Math.PI / 2) * (headWidth / 2);
+        ctx.beginPath();
+        ctx.moveTo(tipX, tipY);
+        ctx.lineTo(leftX, leftY);
+        ctx.lineTo(rightX, rightY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
       // Event listeners for both touch and mouse
       canvas.addEventListener("touchstart", handleInputStart);
       canvas.addEventListener("touchmove", handleInputMove);
@@ -1240,6 +1294,7 @@
         updatePlayers(); // Call updatePlayers here
         drawPlayers();
         drawBall();
+        drawAimingArrow(); // Call drawAimingArrow here
 
         if (!gameState.gameWon) {
           updateBall();
