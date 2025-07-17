@@ -133,6 +133,7 @@
       let hasBounced = false;
       let hasBouncedIn = false;
       // Add at the top, after other global variables:
+      let hasBouncedSinceLastHit = false;
       let isServeInProgress = false;
 
       // Game objects - initialize with default values
@@ -336,7 +337,9 @@
         // ball.vx *= 0.95; // Stronger friction
         // ball.vy *= 0.95;
 
-        // If the ball leaves the canvas on any side (with margin), score a point
+        // --- Out on volley wide ---
+        const left = table.x;
+        const right = table.x + table.width;
         const margin = 20;
         if (
           ball.x < margin ||
@@ -344,21 +347,25 @@
           ball.y < table.y ||
           ball.y > table.y + table.height
         ) {
-          if (hasBouncedIn) {
-            // Ball bounced in, point to last hitter's team
-            let lastHitterIdx =
-              allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
-            let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+          let lastHitterIdx =
+            typeof lastHitterIndex !== "undefined"
+              ? lastHitterIndex
+              : allowedHitter < 2
+              ? lastHitter[1]
+              : lastHitter[0];
+          let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+          let opponentTeam = hitterTeam === 1 ? 2 : 1;
+          if (hasBouncedSinceLastHit) {
             scorePoint(hitterTeam);
+            hasBouncedIn = false;
+            hasBouncedSinceLastHit = false;
+            return;
           } else {
-            // Ball never bounced in, point to opponent of last hitter
-            let lastHitterIdx =
-              allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
-            let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
-            let opponentTeam = hitterTeam === 1 ? 2 : 1;
             scorePoint(opponentTeam);
+            hasBouncedIn = false;
+            hasBouncedSinceLastHit = false;
+            return;
           }
-          return;
         }
 
         // Check paddle collisions
@@ -385,17 +392,22 @@
                 isServeInProgress = false;
                 let opponentTeam = players[server].team === 1 ? 2 : 1;
                 scorePoint(opponentTeam);
+                hasBouncedIn = false;
+                hasBouncedSinceLastHit = false;
                 return;
               } else if (ball.x < table.x || ball.x > table.x + table.width) {
                 // Serve is wide, out
                 isServeInProgress = false;
                 let opponentTeam = players[server].team === 1 ? 2 : 1;
                 scorePoint(opponentTeam);
+                hasBouncedIn = false;
+                hasBouncedSinceLastHit = false;
                 return;
               } else {
                 // Serve is in, allow regular gameplay
                 isServeInProgress = false;
                 hasBouncedIn = true;
+                hasBouncedSinceLastHit = false;
                 // Do not return; allow normal hit logic to proceed
               }
             }
@@ -420,6 +432,8 @@
                 // Ball did not cross the net: point to opponent (failed shot)
                 scorePoint(opponentTeam);
               }
+              hasBouncedIn = false;
+              hasBouncedSinceLastHit = false;
               return;
             }
             // Before setting a new bounceState, show the previous one if not yet shown
@@ -456,6 +470,7 @@
               ballStuckToAI = true;
               setTimeout(() => {
                 // AI hit logic
+                lastHitterIndex = i;
                 const fixedHitSpeed = 4; // Always fixed speed
                 let angle = (Math.random() - 0.5) * 0.6; // random angle
                 let vx = Math.sin(angle) * Math.abs(fixedHitSpeed);
@@ -497,6 +512,7 @@
                   lastHitter[1] = i;
                 }
                 allowedHitter = nextHitter;
+                hasBouncedSinceLastHit = false;
               }, 400 + Math.random() * 400);
               return;
             }
@@ -628,6 +644,8 @@
                 // Serve is out, award point to opponent
                 let opponentTeam = players[server].team === 1 ? 2 : 1;
                 scorePoint(opponentTeam);
+                hasBouncedIn = false;
+                hasBouncedSinceLastHit = false;
                 return;
               }
             }
@@ -662,10 +680,21 @@
                 bouncePing.y <= bottom;
             }
             if (!inBounds) {
+              let lastHitterIdx =
+                typeof lastHitterIndex !== "undefined"
+                  ? lastHitterIndex
+                  : allowedHitter < 2
+                  ? lastHitter[1]
+                  : lastHitter[0];
+              let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+              let opponentTeam = hitterTeam === 1 ? 2 : 1;
               scorePoint(opponentTeam);
+              hasBouncedIn = false;
+              hasBouncedSinceLastHit = false;
               return;
             } else {
               hasBouncedIn = true; // Only set true if bounce was in
+              hasBouncedSinceLastHit = true;
             }
             // --- End bounce-based out detection ---
           }
@@ -824,11 +853,15 @@
           }
           ball.vx = 0;
           ball.vy = 0;
+          hasBouncedIn = false;
+          hasBouncedSinceLastHit = false;
 
           // If the server is an AI, trigger AI serve after a short delay
           if (server !== 0) {
             setTimeout(() => {
               // AI serve: 85-90% chance of going in on the correct quadrant
+              lastHitterIndex = server;
+              hasBouncedSinceLastHit = false;
               let placement;
               let rand = Math.random();
               let targetX;
@@ -1083,6 +1116,8 @@
             currentPlacementOwner = null;
           }
           // Hit the ball
+          lastHitterIndex = 0; // User is always player 0
+          hasBouncedSinceLastHit = false;
           const fixedSpeed = 4;
           ball.vx = Math.cos(aimAngle) * fixedSpeed;
           ball.vy = Math.sin(aimAngle) * fixedSpeed;
@@ -1120,6 +1155,8 @@
 
         if (chargePower > 0.1) {
           // Serve or hit the ball
+          lastHitterIndex = 0; // User is always player 0
+          hasBouncedSinceLastHit = false;
           const fixedSpeed = 4; // Stronger serve
           ball.vx = Math.cos(aimAngle) * fixedSpeed;
           ball.vy = Math.sin(aimAngle) * fixedSpeed;
