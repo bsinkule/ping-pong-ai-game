@@ -8,7 +8,7 @@
       body {
         margin: 0;
         padding: 0;
-        background: #1a1a1a;
+        background: #385535;
         font-family: Arial, sans-serif;
         overflow: hidden;
         user-select: none;
@@ -80,7 +80,7 @@
         transition: color 0.2s;
       }
       #menuBtn:hover {
-        color: #00e6ff;
+        color: #888;
       }
       #bottomBar {
         position: absolute;
@@ -206,6 +206,218 @@
     >
       Start New Game
     </button>
+
+    <!-- Menu Modal -->
+    <div
+      id="menuModal"
+      style="
+        display: none;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 66vh;
+        background: #385535;
+        border-top-left-radius: 32px;
+        border-top-right-radius: 32px;
+        z-index: 500;
+        box-shadow: 0 -8px 32px #000a;
+        margin: 0;
+        padding: 0;
+        overflow-y: auto;
+        transition: transform 0.3s cubic-bezier(0.4, 1.4, 0.6, 1);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      "
+    >
+      <div
+        style="
+          width: 100%;
+          max-width: 600px;
+          padding: 0 20px 24px 20px;
+          box-sizing: border-box;
+          margin: 0 auto;
+        "
+      >
+        <div
+          style="
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: #385535;
+            border-top-left-radius: 32px;
+            border-top-right-radius: 32px;
+            padding: 32px 24px 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 64px;
+          "
+        >
+          <h2
+            style="
+              color: #fff;
+              margin: 0 auto 0 auto;
+              text-align: center;
+              letter-spacing: 2px;
+              flex: 1;
+              font-size: 2rem;
+            "
+          >
+            Menu
+          </h2>
+          <button
+            id="closeMenuBtn"
+            style="
+              position: absolute;
+              top: 18px;
+              right: 18px;
+              background: #222;
+              color: #fff;
+              border: none;
+              border-radius: 50%;
+              width: 38px;
+              height: 38px;
+              font-size: 1.5rem;
+              cursor: pointer;
+              z-index: 10;
+            "
+          >
+            &times;
+          </button>
+        </div>
+        <div
+          id="controlsSection"
+          style="
+            background: #46643e;
+            border-radius: 18px;
+            padding: 18px 16px;
+            margin: 24px 0 24px 0;
+            cursor: pointer;
+          "
+        >
+          <h3 style="color: #fff; margin: 0 0 8px 0; font-size: 1.2rem">
+            Game Controls
+          </h3>
+          <p
+            id="controlsToggleMsg"
+            style="color: #e0e0e0; margin: 0; font-size: 1rem"
+          >
+            Click to view controls
+          </p>
+          <ul
+            id="controlsList"
+            style="
+              display: none;
+              color: #e0e0e0;
+              margin: 0;
+              font-size: 1rem;
+              padding-left: 20px;
+            "
+          >
+            <li>
+              <b>Desktop:</b> Click/tap to move. Hold and drag to aim and charge
+              your shot. Release to hit.
+            </li>
+            <li>
+              <b>Mobile:</b> Tap to move. Hold and drag to aim and charge your
+              shot. Release to hit.
+            </li>
+            <li>Menu: Top-right button (pauses game)</li>
+          </ul>
+        </div>
+        <div
+          id="rulesSection"
+          style="
+            background: #46643e;
+            border-radius: 18px;
+            padding: 18px 16px;
+            margin-bottom: 24px;
+            cursor: pointer;
+          "
+        >
+          <h3 style="color: #fff; margin: 0 0 8px 0; font-size: 1.2rem">
+            Lob Pong Rules
+          </h3>
+          <p style="color: #e0e0e0; margin: 0; font-size: 1rem">
+            Click to view rules
+          </p>
+        </div>
+        <div
+          id="rulesModal"
+          style="
+            display: none;
+            background: #2d3e25;
+            border-radius: 16px;
+            padding: 18px 16px;
+            margin-bottom: 24px;
+            color: #fff;
+            font-size: 1.05rem;
+          "
+        >
+          <h3 style="margin-top: 0; margin-bottom: 12px; color: #f7e14a">
+            Lob Pong Rules
+          </h3>
+          <ul style="padding-left: 20px; margin: 0">
+            <li>Play to 15 points (must win by 2)</li>
+            <li>
+              The ball must always clear the bar on serves and during play
+            </li>
+            <li>
+              5 serves per player before switching to a player on the other team
+              to serve 5 times
+            </li>
+            <li>Serve diagonally</li>
+            <li>
+              During gameplay, teammates must alternate turns (i.e. the same
+              player cannot hit the ball two turns in a row for their team)
+            </li>
+            <li>
+              If the ball hits a cup, play can continue as long as the ball has
+              only hit the table once
+            </li>
+            <li>
+              If the ball goes in a cup, PARTY! Also the team that made it gets
+              a point ;)
+            </li>
+          </ul>
+        </div>
+        <button
+          id="restartBtn"
+          style="
+            width: 100%;
+            background: #222;
+            color: #fff;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 0;
+            margin-bottom: 18px;
+            cursor: pointer;
+          "
+        >
+          Restart New Game
+        </button>
+        <button
+          id="buyBtn"
+          style="
+            width: 100%;
+            background: #f7e14a;
+            color: #222;
+            font-size: 1.1rem;
+            border: none;
+            border-radius: 12px;
+            padding: 14px 0;
+            margin-bottom: 0;
+            cursor: pointer;
+            font-weight: bold;
+          "
+        >
+          BUY REAL Lob Pong set!
+        </button>
+      </div>
+    </div>
 
     <script>
       const canvas = document.getElementById("gameCanvas");
@@ -1512,23 +1724,110 @@
       // Prevent context menu on right click
       canvas.addEventListener("contextmenu", (e) => e.preventDefault());
 
-      // Game loop
-      function gameLoop() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let isMenuOpen = false;
+      let gamePaused = false;
+      let animationFrameId = null;
 
+      function pauseGame() {
+        gamePaused = true;
+      }
+      function resumeGame() {
+        gamePaused = false;
+        gameLoop();
+      }
+
+      // Override gameLoop to respect pause
+      function gameLoop() {
+        if (gamePaused) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawTable();
-        updatePlayers(); // Call updatePlayers here
+        updatePlayers();
         drawPlayers();
         drawBall();
-        drawAimingArrow(); // Call drawAimingArrow here
-
+        drawAimingArrow();
         if (!gameState.gameWon) {
           updateBall();
           updateAI();
         }
-
-        requestAnimationFrame(gameLoop);
+        animationFrameId = requestAnimationFrame(gameLoop);
       }
+
+      // Menu button logic
+      const menuBtn = document.getElementById("menuBtn");
+      const menuModal = document.getElementById("menuModal");
+      const closeMenuBtn = document.getElementById("closeMenuBtn");
+      const restartBtn = document.getElementById("restartBtn");
+      const buyBtn = document.getElementById("buyBtn");
+      let menuOpen = false;
+      // Ensure menu is closed on page load
+      menuModal.style.display = "none";
+      menuOpen = false;
+      menuBtn.onclick = function () {
+        menuOpen = !menuOpen;
+        if (menuOpen) {
+          isMenuOpen = true;
+          pauseGame();
+          menuModal.style.display = "block";
+          menuModal.style.transform = "translateY(0)";
+        } else {
+          isMenuOpen = false;
+          menuModal.style.display = "none";
+          resumeGame();
+        }
+      };
+      closeMenuBtn.onclick = function () {
+        menuOpen = false;
+        isMenuOpen = false;
+        menuModal.style.display = "none";
+        resumeGame();
+      };
+      // Clicking outside the modal closes it (optional, not required by user)
+      menuModal.addEventListener("click", function (e) {
+        if (e.target === menuModal) {
+          menuOpen = false;
+          isMenuOpen = false;
+          menuModal.style.display = "none";
+          resumeGame();
+        }
+      });
+      // Rules section logic
+      const rulesSection = document.getElementById("rulesSection");
+      const rulesModal = document.getElementById("rulesModal");
+      rulesSection.onclick = function () {
+        if (rulesModal.style.display === "none") {
+          rulesModal.style.display = "block";
+          rulesSection.querySelector("p").textContent = "Click to hide rules";
+        } else {
+          rulesModal.style.display = "none";
+          rulesSection.querySelector("p").textContent = "Click to view rules";
+        }
+      };
+      // Controls section logic
+      const controlsSection = document.getElementById("controlsSection");
+      const controlsList = document.getElementById("controlsList");
+      const controlsToggleMsg = document.getElementById("controlsToggleMsg");
+      controlsSection.onclick = function () {
+        if (controlsList.style.display === "none") {
+          controlsList.style.display = "block";
+          controlsToggleMsg.textContent = "Click to hide controls";
+        } else {
+          controlsList.style.display = "none";
+          controlsToggleMsg.textContent = "Click to view controls";
+        }
+      };
+      // Restart New Game button
+      restartBtn.onclick = function () {
+        // Simulate new game button click
+        document.getElementById("newGameBtn").click();
+        menuOpen = false;
+        isMenuOpen = false;
+        menuModal.style.display = "none";
+        resumeGame();
+      };
+      // Buy button
+      buyBtn.onclick = function () {
+        window.open("https://lobpong.co/products/lob-pong-game-set", "_blank");
+      };
 
       // Initialize and start game
       resizeCanvas();
