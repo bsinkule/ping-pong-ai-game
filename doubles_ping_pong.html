@@ -139,6 +139,26 @@
       #controls {
         display: none;
       }
+      /* Pulse animation for win message */
+      @keyframes pulseWin {
+        0% {
+          transform: scale(1);
+          filter: brightness(1);
+        }
+        50% {
+          transform: scale(1.12);
+          filter: brightness(1.5);
+        }
+        100% {
+          transform: scale(1);
+          filter: brightness(1);
+        }
+      }
+      .winPulse {
+        animation: pulseWin 1.1s infinite;
+        font-weight: bold;
+        letter-spacing: 2px;
+      }
     </style>
   </head>
   <body>
@@ -162,6 +182,30 @@
     <div id="bottomBar">
       <div id="gameInfo">Serving: Player 1</div>
     </div>
+
+    <!-- Start New Game button, hidden by default -->
+    <button
+      id="newGameBtn"
+      style="
+        display: none;
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        z-index: 300;
+        font-size: 2rem;
+        padding: 18px 48px;
+        border-radius: 18px;
+        border: none;
+        background: #222;
+        color: #fff;
+        box-shadow: 0 4px 24px #0008;
+        cursor: pointer;
+        font-weight: bold;
+      "
+    >
+      Start New Game
+    </button>
 
     <script>
       const canvas = document.getElementById("gameCanvas");
@@ -938,9 +982,15 @@
         // Check win condition
         if (gameState.score1 >= 15 || gameState.score2 >= 15) {
           gameState.gameWon = true;
-          document.getElementById(
-            "gameInfo"
-          ).textContent = `Team ${team} Wins!`;
+          // Show win message with color and pulse
+          const winMsg = team === 1 ? "Blue Team Wins!" : "Red Team Wins!";
+          const winColor = team === 1 ? "#2196F3" : "#F44336";
+          const gameInfo = document.getElementById("gameInfo");
+          gameInfo.textContent = winMsg;
+          gameInfo.style.color = winColor;
+          gameInfo.classList.add("winPulse");
+          // Show new game button
+          document.getElementById("newGameBtn").style.display = "block";
           return;
         }
 
@@ -1461,6 +1511,67 @@
       window.addEventListener("resize", resizeCanvas);
       isServeInProgress = true;
       gameLoop();
+
+      // Reset win message style and color when starting a new game
+      function resetWinMessage() {
+        const gameInfo = document.getElementById("gameInfo");
+        gameInfo.classList.remove("winPulse");
+        gameInfo.style.color = "#fff";
+      }
+
+      // New Game button handler
+      document.getElementById("newGameBtn").onclick = function () {
+        // Reset all game state
+        gameState.score1 = 0;
+        gameState.score2 = 0;
+        gameState.currentServer = 0;
+        gameState.servesLeft = 5;
+        gameState.currentHitter = 0;
+        gameState.ballInPlay = false;
+        gameState.gameWon = false;
+        serveRotationIndex = 0;
+        lastHitter = [0, 2];
+        allowedHitter = 0;
+        ballStuck = false;
+        stuckPlayer = null;
+        aiPlacement = 0;
+        aiPlacementTimeout = null;
+        showingAIPlacement = false;
+        currentPlacementOwner = null;
+        aiCharging = false;
+        aiWaitingForBallToLeave = false;
+        aiChargingPlayer = null;
+        ballStuckToAI = false;
+        lastAIHitter = null;
+        bouncePing = null;
+        bounceState = null;
+        teammatePlacement = 0;
+        hasBounced = false;
+        hasBouncedIn = false;
+        aimingArrowState = { x: 0, y: 0, angle: 0, length: 0, visible: false };
+        hasBouncedSinceLastHit = false;
+        isServeInProgress = true;
+        flightStartY = null;
+        flightEndY = null;
+        flightActive = false;
+        // Reset scores in UI
+        document.getElementById("score1").textContent = 0;
+        document.getElementById("score2").textContent = 0;
+        // Hide new game button
+        document.getElementById("newGameBtn").style.display = "none";
+        // Reset win message style
+        resetWinMessage();
+        // Reset player and ball positions
+        resizeCanvas();
+        // Show serve info
+        document.getElementById(
+          "gameInfo"
+        ).textContent = `Serving: Player 1 (Serves left: 5)`;
+        setTimeout(() => {
+          document.getElementById("gameInfo").textContent =
+            "Your serve! Hold to aim & power";
+        }, 2000);
+      };
     </script>
   </body>
 </html>
