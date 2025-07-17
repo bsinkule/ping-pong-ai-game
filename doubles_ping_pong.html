@@ -21,13 +21,87 @@
         cursor: crosshair;
       }
 
-      #ui {
+      #topBar {
         position: absolute;
-        top: 10px;
-        left: 10px;
-        color: white;
-        font-size: 18px;
-        z-index: 100;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 64px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        z-index: 200;
+        background: none;
+        pointer-events: none;
+      }
+      #logo {
+        height: 54px;
+        margin-left: 16px;
+        margin-top: 4px;
+        pointer-events: auto;
+      }
+      #scoreBar {
+        flex: 1;
+        text-align: center;
+        font-size: 2rem;
+        font-weight: bold;
+        letter-spacing: 2px;
+        pointer-events: auto;
+      }
+      .score {
+        padding: 0 12px;
+        font-size: 2.1rem;
+        vertical-align: middle;
+      }
+      .score.blue {
+        color: #2196f3;
+        text-shadow: 0 0 8px #2196f3cc;
+      }
+      .score.red {
+        color: #f44336;
+        text-shadow: 0 0 8px #f44336cc;
+      }
+      .score-separator {
+        color: #fff;
+        font-size: 2rem;
+        padding: 0 8px;
+      }
+      #menuBtn {
+        background: none;
+        border: none;
+        color: #fff;
+        font-size: 2.4rem;
+        margin-right: 18px;
+        margin-top: 2px;
+        cursor: pointer;
+        z-index: 201;
+        pointer-events: auto;
+        filter: drop-shadow(0 0 4px #000a);
+        transition: color 0.2s;
+      }
+      #menuBtn:hover {
+        color: #00e6ff;
+      }
+      #bottomBar {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100vw;
+        height: 54px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 200;
+        pointer-events: none;
+      }
+      #gameInfo {
+        color: #fff;
+        font-size: 1.1rem;
+        background: rgba(0, 0, 0, 0.32);
+        border-radius: 12px;
+        padding: 6px 22px;
+        box-shadow: 0 2px 12px #0006;
+        pointer-events: auto;
       }
 
       #powerMeter {
@@ -63,25 +137,20 @@
       }
 
       #controls {
-        position: absolute;
-        bottom: 10px;
-        left: 10px;
-        color: white;
-        font-size: 14px;
-        z-index: 100;
+        display: none;
       }
     </style>
   </head>
   <body>
     <canvas id="gameCanvas"></canvas>
-    <div id="ui">
-      <div>
-        Team 1: <span id="score1">0</span> | Team 2: <span id="score2">0</span>
+    <div id="topBar">
+      <img id="logo" src="lob-pong-logo.png" alt="Lob Pong Logo" />
+      <div id="scoreBar">
+        <span id="score1" class="score blue">0</span>
+        <span class="score-separator">|</span>
+        <span id="score2" class="score red">0</span>
       </div>
-      <div id="gameInfo">Serving: Player 1</div>
-      <div id="instructions">
-        Your serve! Click/tap to move, hold to aim & power
-      </div>
+      <button id="menuBtn" aria-label="Menu">&#9776;</button>
     </div>
 
     <div id="powerMeter">
@@ -90,9 +159,8 @@
 
     <div id="aimArrow"></div>
 
-    <div id="controls">
-      💻 Mouse: Click to move, hold to aim & shoot<br />
-      📱 Mobile: Tap to move, hold to aim & shoot
+    <div id="bottomBar">
+      <div id="gameInfo">Serving: Player 1</div>
     </div>
 
     <script>
@@ -281,16 +349,25 @@
           ctx.save();
           if (i !== allowedHitter) {
             ctx.globalAlpha = 0.3; // Dim everyone except allowedHitter
+          } else {
+            ctx.globalAlpha = 1;
           }
-          // Player paddle
-          ctx.fillStyle = player.isUser
-            ? "#4CAF50"
-            : player.team === 1
-            ? "#2196F3"
-            : "#F44336";
+          // Player paddle: both team 1 (0,1) are blue, team 2 (2,3) are red
+          ctx.fillStyle = player.team === 1 ? "#2196F3" : "#F44336";
           ctx.beginPath();
           ctx.arc(player.x, player.y, 18, 0, Math.PI * 2);
           ctx.fill();
+
+          // Neon blue border for user (player 0), dims with player, no shadow for mobile compatibility
+          if (i === 0) {
+            ctx.save();
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = "#00e6ff";
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, 20, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.restore();
+          }
 
           // Player number
           ctx.fillStyle = "#fff";
@@ -298,14 +375,6 @@
           ctx.textAlign = "center";
           ctx.fillText(i + 1, player.x, player.y + 5);
 
-          // Highlight current hitter
-          // if (i === gameState.currentHitter) {
-          //   ctx.strokeStyle = "#ffff44";
-          //   ctx.lineWidth = 4;
-          //   ctx.beginPath();
-          //   ctx.arc(player.x, player.y, 25, 0, Math.PI * 2);
-          //   ctx.stroke();
-          // }
           ctx.restore();
         });
       }
@@ -663,7 +732,6 @@
             ballStuck = true;
             stuckPlayer = 0;
             charging = false;
-            chargePower = 0;
             // aimArrow.style.display = "none"; // Removed
             powerFill.style.height = "0%";
             return;
@@ -873,7 +941,6 @@
           document.getElementById(
             "gameInfo"
           ).textContent = `Team ${team} Wins!`;
-          document.getElementById("instructions").textContent = "Game Over!";
           return;
         }
 
@@ -886,153 +953,157 @@
         }
 
         gameState.currentHitter = gameState.currentServer;
+        // Show 'Serving: Player...' for 3s, then switch to instructions
         document.getElementById("gameInfo").textContent = `Serving: Player ${
           gameState.currentServer + 1
         } (Serves left: ${gameState.servesLeft})`;
 
-        // Reset player and ball position for serve
-        setTimeout(() => {
-          // Designated serve spots (same as in resizeCanvas)
-          const serveSpots = [
-            {
-              x: table.x + table.width * 0.3,
-              y: table.y + table.height * 0.94,
-            },
-            {
-              x: table.x + table.width * 0.7,
-              y: table.y + table.height * 0.94,
-            },
-            {
-              x: table.x + table.width * 0.3,
-              y: table.y + table.height * 0.06,
-            },
-            {
-              x: table.x + table.width * 0.7,
-              y: table.y + table.height * 0.06,
-            },
-          ];
-          const server = gameState.currentServer;
-          players[server].x = players[server].targetX = serveSpots[server].x;
-          players[server].y = serveSpots[server].y;
-          // For user, also lock their teammate to default spot
-          if (server === 0) {
-            players[1].x = players[1].targetX = serveSpots[1].x;
-            players[1].y = serveSpots[1].y;
-          }
-          // For AI, also lock their teammate to default spot
-          if (server === 2) {
-            players[3].x = players[3].targetX = serveSpots[3].x;
-            players[3].y = serveSpots[3].y;
-          }
-          ball.x = players[server].x;
-          // Place ball in front of server (above for top, below for bottom)
-          if (server === 0 || server === 1) {
-            ball.y = players[server].y - 50;
-          } else {
-            ball.y = players[server].y + 50;
-          }
-          ball.vx = 0;
-          ball.vy = 0;
-          hasBouncedIn = false;
-          hasBouncedSinceLastHit = false;
+        // --- IMMEDIATE SERVE RESET LOGIC (was inside setTimeout) ---
+        const serveSpots = [
+          {
+            x: table.x + table.width * 0.3,
+            y: table.y + table.height * 0.94,
+          },
+          {
+            x: table.x + table.width * 0.7,
+            y: table.y + table.height * 0.94,
+          },
+          {
+            x: table.x + table.width * 0.3,
+            y: table.y + table.height * 0.06,
+          },
+          {
+            x: table.x + table.width * 0.7,
+            y: table.y + table.height * 0.06,
+          },
+        ];
+        const server = gameState.currentServer;
+        players[server].x = players[server].targetX = serveSpots[server].x;
+        players[server].y = serveSpots[server].y;
+        // For user, also lock their teammate to default spot
+        if (server === 0) {
+          players[1].x = players[1].targetX = serveSpots[1].x;
+          players[1].y = serveSpots[1].y;
+        }
+        // For AI, also lock their teammate to default spot
+        if (server === 2) {
+          players[3].x = players[3].targetX = serveSpots[3].x;
+          players[3].y = serveSpots[3].y;
+        }
+        ball.x = players[server].x;
+        // Place ball in front of server (above for bottom, below for top)
+        if (server === 0 || server === 1) {
+          ball.y = players[server].y - 50;
+        } else {
+          ball.y = players[server].y + 50;
+        }
+        ball.vx = 0;
+        ball.vy = 0;
+        hasBouncedIn = false;
+        hasBouncedSinceLastHit = false;
 
-          // If the server is an AI, trigger AI serve after a short delay
-          if (server !== 0) {
-            setTimeout(() => {
-              // AI serve: 85-90% chance of going in on the correct quadrant
-              lastHitterIndex = server;
-              hasBouncedSinceLastHit = false;
-              let placement;
-              let rand = Math.random();
-              let targetX;
-              const centerX = table.x + table.width / 2;
-              if (rand < 0.875) {
-                // 87.5% chance: serve in, aim for center of correct quadrant
-                placement = 0.55 + Math.random() * 0.35; // 0.55-0.9
-                // Determine target x for correct quadrant
-                if (server === 0 || server === 2) {
-                  // Right half
-                  targetX =
-                    centerX +
-                    table.width / 4 +
-                    (Math.random() - 0.5) * (table.width / 6);
-                } else {
-                  // Left half
-                  targetX =
-                    centerX -
-                    table.width / 4 +
-                    (Math.random() - 0.5) * (table.width / 6);
-                }
+        // If the server is an AI, trigger AI serve after a short delay
+        if (server !== 0) {
+          setTimeout(() => {
+            // AI serve: 85-90% chance of going in on the correct quadrant
+            lastHitterIndex = server;
+            hasBouncedSinceLastHit = false;
+            let placement;
+            let rand = Math.random();
+            let targetX;
+            const centerX = table.x + table.width / 2;
+            if (rand < 0.875) {
+              // 87.5% chance: serve in, aim for center of correct quadrant
+              placement = 0.55 + Math.random() * 0.35; // 0.55-0.9
+              // Determine target x for correct quadrant
+              if (server === 0 || server === 2) {
+                // Right half
+                targetX =
+                  centerX +
+                  table.width / 4 +
+                  (Math.random() - 0.5) * (table.width / 6);
               } else {
-                // 12.5% chance: serve out (either short or long, random side)
-                placement =
-                  Math.random() < 0.5
-                    ? 0.2 + Math.random() * 0.28
-                    : 0.91 + Math.random() * 0.09;
-                // Out serves: aim randomly across the table
-                targetX = table.x + Math.random() * table.width;
+                // Left half
+                targetX =
+                  centerX -
+                  table.width / 4 +
+                  (Math.random() - 0.5) * (table.width / 6);
               }
-              // Calculate angle to targetX at far end line
-              let fromX = players[server].x;
-              let fromY = players[server].y;
-              let toY =
-                server === 0 || server === 1 ? table.y : table.y + table.height;
-              let toX = targetX;
-              let angle =
-                Math.atan2(toY - fromY, toX - fromX) +
-                (Math.random() - 0.5) * 0.12;
-              const fixedSpeed = 4;
-              let vx = Math.cos(angle) * fixedSpeed;
-              let vy = Math.sin(angle) * fixedSpeed;
-              ball.vx = vx;
-              ball.vy = vy;
-              gameState.ballInPlay = true;
-              // After the serve, set allowedHitter to the diagonal opponent
-              const diagonal = [3, 2, 1, 0];
-              allowedHitter = diagonal[server];
-              gameState.currentHitter = allowedHitter;
-              // Set bounce state for AI serve
-              const bounce = getBounceLocation(
-                players[server].x,
-                players[server].y,
-                placement,
-                server === 0 || server === 1,
-                vx,
-                vy
-              );
-              bounceState = {
-                x: bounce.x,
-                y: bounce.y,
-                shown: false,
-                color: "#fff",
-              };
-              hasBouncedIn = false;
-            }, 600);
-          }
+            } else {
+              // 12.5% chance: serve out (either short or long, random side)
+              placement =
+                Math.random() < 0.5
+                  ? 0.2 + Math.random() * 0.28
+                  : 0.91 + Math.random() * 0.09;
+              // Out serves: aim randomly across the table
+              targetX = table.x + Math.random() * table.width;
+            }
+            // Calculate angle to targetX at far end line
+            let fromX = players[server].x;
+            let fromY = players[server].y;
+            let toY =
+              server === 0 || server === 1 ? table.y : table.y + table.height;
+            let toX = targetX;
+            let angle =
+              Math.atan2(toY - fromY, toX - fromX) +
+              (Math.random() - 0.5) * 0.12;
+            const fixedSpeed = 4;
+            let vx = Math.cos(angle) * fixedSpeed;
+            let vy = Math.sin(angle) * fixedSpeed;
+            ball.vx = vx;
+            ball.vy = vy;
+            gameState.ballInPlay = true;
+            // After the serve, set allowedHitter to the diagonal opponent
+            const diagonal = [3, 2, 1, 0];
+            allowedHitter = diagonal[server];
+            gameState.currentHitter = allowedHitter;
+            // Set bounce state for AI serve
+            const bounce = getBounceLocation(
+              players[server].x,
+              players[server].y,
+              placement,
+              server === 0 || server === 1,
+              vx,
+              vy
+            );
+            bounceState = {
+              x: bounce.x,
+              y: bounce.y,
+              shown: false,
+              color: "#fff",
+            };
+            hasBouncedIn = false;
+            // Set gameplay instructions as soon as gameplay starts
+            setGameplayInstructions();
+          }, 600);
+        }
 
-          // In serve reset (setTimeout in scorePoint), set allowedHitter = server (not diagonal opponent):
-          allowedHitter = server;
-          gameState.currentHitter = server;
+        // In serve reset, set allowedHitter = server (not diagonal opponent):
+        allowedHitter = server;
+        gameState.currentHitter = server;
 
-          // Set lastHitter so alternation works after the first return
-          // Team 1: indices 0,1; Team 2: indices 2,3
-          // If server is team 1 (0 or 1), lastHitter = [server, diagonal[server]]
-          // If server is team 2 (2 or 3), lastHitter = [diagonal[server], server]
-          const diagonal = [3, 2, 1, 0];
-          if (server === 0 || server === 1) {
-            lastHitter = [server, diagonal[server]];
-          } else {
-            lastHitter = [diagonal[server], server];
-          }
+        // Set lastHitter so alternation works after the first return
+        // Team 1: indices 0,1; Team 2: indices 2,3
+        // If server is team 1 (0 or 1), lastHitter = [server, diagonal[server]]
+        // If server is team 2 (2 or 3), lastHitter = [diagonal[server], server]
+        const diagonal = [3, 2, 1, 0];
+        if (server === 0 || server === 1) {
+          lastHitter = [server, diagonal[server]];
+        } else {
+          lastHitter = [diagonal[server], server];
+        }
+        // --- END IMMEDIATE SERVE RESET LOGIC ---
 
+        // After serve reset, show instructions after 2s
+        setTimeout(() => {
           if (gameState.currentServer === 0) {
-            document.getElementById("instructions").textContent =
+            document.getElementById("gameInfo").textContent =
               "Your serve! Hold to aim & power";
           } else {
-            document.getElementById("instructions").textContent =
+            document.getElementById("gameInfo").textContent =
               "Click/tap to move, hold to aim & power";
           }
-        }, 1000);
+        }, 2000);
         lastHitter = [0, 2]; // Reset alternation on point
         allowedHitter = gameState.currentServer;
         ballStuck = false;
@@ -1272,6 +1343,8 @@
             shown: false,
             color: "#fff",
           };
+          // Set gameplay instructions as soon as gameplay starts
+          setGameplayInstructions();
         }
       }
 
@@ -1307,6 +1380,12 @@
         }
 
         return { x: predictedX, y: targetY };
+      }
+
+      // Add this function at the top level, after other helpers:
+      function setGameplayInstructions() {
+        document.getElementById("gameInfo").textContent =
+          "Click/tap to move, hold to aim & power";
       }
 
       // Add this function at the top level, after other helpers:
@@ -1382,12 +1461,6 @@
       window.addEventListener("resize", resizeCanvas);
       isServeInProgress = true;
       gameLoop();
-
-      // Start message
-      setTimeout(() => {
-        document.getElementById("instructions").textContent =
-          "Your serve! Click/tap and hold to aim & power";
-      }, 500);
     </script>
   </body>
 </html>
