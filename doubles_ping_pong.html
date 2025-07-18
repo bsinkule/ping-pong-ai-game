@@ -472,7 +472,8 @@
       let flightStartY = null;
       let flightEndY = null;
       let flightActive = false;
-
+      // At the top, after other global variables:
+      let awaitingServeReturn = false;
       // Game objects - initialize with default values
       let table = {
         x: 0,
@@ -745,32 +746,22 @@
           ball.y < table.y ||
           ball.y > table.y + table.height
         ) {
-          // Special case: after a valid serve, if the returner misses, award point to server's team
-          if (hasBouncedIn && !isServeInProgress) {
-            // Ball was served in, but return was missed
+          // If awaiting serve return, point goes to server
+          if (awaitingServeReturn) {
             let serverTeam = players[gameState.currentServer].team;
             scorePoint(serverTeam);
-            hasBouncedIn = false;
-            hasBouncedSinceLastHit = false;
-            return;
-          }
-          let lastHitterIdx =
-            typeof lastHitterIndex !== "undefined"
-              ? lastHitterIndex
-              : allowedHitter < 2
-              ? lastHitter[1]
-              : lastHitter[0];
-          let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
-          let opponentTeam = hitterTeam === 1 ? 2 : 1;
-          if (hasBouncedSinceLastHit) {
-            scorePoint(hitterTeam);
-            hasBouncedIn = false;
-            hasBouncedSinceLastHit = false;
+            awaitingServeReturn = false;
             return;
           } else {
-            scorePoint(opponentTeam);
-            hasBouncedIn = false;
-            hasBouncedSinceLastHit = false;
+            // Rally logic: if the ball bounced in before going out, point to last hitter; otherwise, to opponent
+            if (hasBouncedSinceLastHit) {
+              const teamToScore = players[lastHitterIndex].team;
+              scorePoint(teamToScore);
+            } else {
+              let hitterTeam = players[lastHitterIndex].team;
+              let opponentTeam = hitterTeam === 1 ? 2 : 1;
+              scorePoint(opponentTeam);
+            }
             return;
           }
         }
@@ -801,6 +792,7 @@
                 scorePoint(opponentTeam);
                 hasBouncedIn = false;
                 hasBouncedSinceLastHit = false;
+                awaitingServeReturn = false;
                 return;
               } else if (ball.x < table.x || ball.x > table.x + table.width) {
                 // Serve is wide, out
@@ -809,6 +801,7 @@
                 scorePoint(opponentTeam);
                 hasBouncedIn = false;
                 hasBouncedSinceLastHit = false;
+                awaitingServeReturn = false;
                 return;
               } else {
                 // Serve is in, allow regular gameplay
@@ -817,31 +810,6 @@
                 hasBouncedSinceLastHit = false;
                 // Do not return; allow normal hit logic to proceed
               }
-            }
-            // --- Out on volley wide ---
-            // If the ball is outside the table width and has not bounced, count as out
-            const left = table.x;
-            const right = table.x + table.width;
-            if (!hasBouncedIn && (ball.x < left || ball.x > right)) {
-              // Determine which team hit last using lastHitter
-              let lastHitterIdx =
-                allowedHitter < 2 ? lastHitter[1] : lastHitter[0];
-              let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
-              let opponentTeam = hitterTeam === 1 ? 2 : 1;
-              // Check if the ball crossed the net (i.e., y is on the opponent's side)
-              if (
-                (hitterTeam === 1 && ball.y <= table.netY) ||
-                (hitterTeam === 2 && ball.y >= table.netY)
-              ) {
-                // Ball crossed the net and went out wide: point to opponent
-                scorePoint(opponentTeam);
-              } else {
-                // Ball did not cross the net: point to opponent (failed shot)
-                scorePoint(opponentTeam);
-              }
-              hasBouncedIn = false;
-              hasBouncedSinceLastHit = false;
-              return;
             }
             // Before setting a new bounceState, show the previous one if not yet shown
             if (bounceState && !bounceState.shown) {
@@ -944,6 +912,11 @@
             const fixedHitSpeed = 4; // Same as serve speed for consistency
             ball.vx = Math.cos(angle) * fixedHitSpeed;
             ball.vy = Math.sin(angle) * fixedHitSpeed;
+            hasBouncedSinceLastHit = false;
+            // If this is the first return after a valid serve, set awaitingServeReturn to false
+            if (awaitingServeReturn) {
+              awaitingServeReturn = false;
+            }
             if (i === 1) {
               // Randomize teammate placement like AI
               let rand = Math.random();
@@ -1043,6 +1016,7 @@
               color: bounceState.color,
             };
             bounceState.shown = true;
+            hasBouncedSinceLastHit = true;
             // --- Diagonal serve enforcement (first bounce after serve) ---
             if (isServeInProgress) {
               isServeInProgress = false;
@@ -1060,12 +1034,15 @@
                 // Serve is out, award point to opponent
                 let opponentTeam = players[server].team === 1 ? 2 : 1;
                 scorePoint(opponentTeam);
-                hasBouncedIn = false;
-                hasBouncedSinceLastHit = false;
+                awaitingServeReturn = false;
                 return;
               }
+              // Serve is in, so set awaitingServeReturn true for the receiver's chance
+              awaitingServeReturn = true;
+              // Do not return; allow normal hit logic to proceed
             }
             // --- Bounce-based out detection ---
+            // (No need to set any hasBouncedIn or firstServeBounce flags)
             // Determine which team should receive the bounce (who is the opponent?)
             // If last hitter was team 1 (player 0 or 1), bounce must be on team 2's side (top half)
             // If last hitter was team 2 (player 2 or 3), bounce must be on team 1's side (bottom half)
@@ -1096,21 +1073,16 @@
                 bouncePing.y <= bottom;
             }
             if (!inBounds) {
-              let lastHitterIdx =
-                typeof lastHitterIndex !== "undefined"
-                  ? lastHitterIndex
-                  : allowedHitter < 2
-                  ? lastHitter[1]
-                  : lastHitter[0];
-              let hitterTeam = lastHitterIdx < 2 ? 1 : 2;
+              let hitterTeam = players[lastHitterIndex].team;
               let opponentTeam = hitterTeam === 1 ? 2 : 1;
               scorePoint(opponentTeam);
-              hasBouncedIn = false;
-              hasBouncedSinceLastHit = false;
+              // awaitingServeReturn = false; // <-- REMOVE THIS LINE
               return;
             } else {
-              hasBouncedIn = true; // Only set true if bounce was in
-              hasBouncedSinceLastHit = true;
+              // Only set awaitingServeReturn for the first bounce after a serve
+              // if (awaitingServeReturn) {
+              //   awaitingServeReturn = false;
+              // }
             }
             // --- End bounce-based out detection ---
           }
@@ -1395,8 +1367,8 @@
         ballStuck = false;
         stuckPlayer = null;
         hasBounced = false;
-        hasBouncedIn = false;
         isServeInProgress = true;
+        awaitingServeReturn = false;
       }
 
       function getInputPosition(e) {
@@ -1583,6 +1555,7 @@
           };
           hasBouncedIn = false;
           aimingArrowState.visible = false;
+          awaitingServeReturn = false;
           return;
         }
         if (!charging) return;
@@ -1877,6 +1850,7 @@
         flightStartY = null;
         flightEndY = null;
         flightActive = false;
+        firstServeBounce = true;
         // Reset scores in UI
         document.getElementById("score1").textContent = 0;
         document.getElementById("score2").textContent = 0;
