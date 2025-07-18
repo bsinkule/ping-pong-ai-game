@@ -772,6 +772,13 @@
           const dist = Math.sqrt(
             (ball.x - player.x) ** 2 + (ball.y - player.y) ** 2
           );
+          // Prevent hitting a ball that never bounced in and is wide
+          if (
+            !hasBouncedSinceLastHit &&
+            (ball.x < table.x || ball.x > table.x + table.width)
+          ) {
+            return; // Do not allow the hit, let the ball visually continue
+          }
           if (dist < (player.isUser ? ball.radius + 18 : 40)) {
             // --- Diagonal serve enforcement on paddle collision (for full power serves) ---
             if (isServeInProgress) {
