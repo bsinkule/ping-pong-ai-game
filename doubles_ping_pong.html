@@ -749,39 +749,15 @@
           // If awaiting serve return, point goes to server
           if (awaitingServeReturn) {
             let serverTeam = players[gameState.currentServer].team;
-            console.log(
-              "Scoring (serve return): lastHitterIndex",
-              lastHitterIndex,
-              "player",
-              players[lastHitterIndex],
-              "team",
-              players[lastHitterIndex].team
-            );
             scorePoint(serverTeam);
             awaitingServeReturn = false;
             return;
           } else {
             // Rally logic: if the ball bounced in before going out, point to last hitter; otherwise, to opponent
             if (hasBouncedSinceLastHit) {
-              console.log(
-                "Scoring (rally, bounced): lastHitterIndex",
-                lastHitterIndex,
-                "player",
-                players[lastHitterIndex],
-                "team",
-                players[lastHitterIndex].team
-              );
               const teamToScore = players[lastHitterIndex].team;
               scorePoint(teamToScore);
             } else {
-              console.log(
-                "Scoring (rally, no bounce): lastHitterIndex",
-                lastHitterIndex,
-                "player",
-                players[lastHitterIndex],
-                "team",
-                players[lastHitterIndex].team
-              );
               let hitterTeam = players[lastHitterIndex].team;
               let opponentTeam = hitterTeam === 1 ? 2 : 1;
               scorePoint(opponentTeam);
@@ -805,14 +781,6 @@
           }
           if (dist < (player.isUser ? ball.radius + 18 : 40)) {
             lastHitterIndex = i;
-            console.log(
-              "Paddle hit: lastHitterIndex set to",
-              i,
-              "player",
-              players[i],
-              "team",
-              players[i].team
-            );
             // After a valid hit, if awaitingServeReturn is true, set it to false
             if (awaitingServeReturn) {
               awaitingServeReturn = false;
@@ -889,14 +857,6 @@
               ballStuckToAI = true;
               setTimeout(() => {
                 lastHitterIndex = i; // Ensure lastHitterIndex is always set for every AI hit
-                console.log(
-                  "AI hit: lastHitterIndex set to",
-                  i,
-                  "player",
-                  players[i],
-                  "team",
-                  players[i].team
-                );
                 const fixedHitSpeed = 4; // Always fixed speed
                 let angle = (Math.random() - 0.5) * 0.6; // random angle
                 let vx = Math.sin(angle) * Math.abs(fixedHitSpeed);
