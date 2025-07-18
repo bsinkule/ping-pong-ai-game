@@ -1016,17 +1016,22 @@
         }
 
         if (!gameState.isServe && allowedHitter === 0 && !ballStuck) {
-          const dist = Math.sqrt(
-            (ball.x - players[0].x) ** 2 + (ball.y - players[0].y) ** 2
-          );
-          if (dist < ball.radius + 30) {
-            // Increased stick distance
-            ballStuck = true;
-            stuckPlayer = 0;
-            charging = false;
-            // aimArrow.style.display = "none"; // Removed
-            powerFill.style.height = "0%";
-            return;
+          // Only allow sticking if the ball has bounced since last hit, or is within the table width
+          if (
+            hasBouncedSinceLastHit ||
+            (ball.x >= table.x && ball.x <= table.x + table.width)
+          ) {
+            const dist = Math.sqrt(
+              (ball.x - players[0].x) ** 2 + (ball.y - players[0].y) ** 2
+            );
+            if (dist < ball.radius + 30) {
+              // Increased stick distance
+              ballStuck = true;
+              stuckPlayer = 0;
+              charging = false;
+              powerFill.style.height = "0%";
+              return;
+            }
           }
         }
         // While ballStuck, make the ball follow the player
