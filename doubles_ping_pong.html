@@ -549,11 +549,88 @@
       }
 
       function drawTable() {
-        // Table surface
+        const sideHeight = 10;
+
+        // 1. Draw the back right leg FIRST
+        ctx.fillStyle = "#333";
+        const legWidth = 9;
+        const legHeight = 50;
+        const backRightLegX = table.x + table.width + 2;
+        const backRightLegY = table.y + sideHeight + 18;
+        const backRightLegAngle = -0.15;
+        function drawLeg(x, y, angle, height = legHeight) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.beginPath();
+          ctx.rect(0, 0, legWidth, height - 5);
+          ctx.arc(legWidth / 2, height - 5, legWidth / 2, 0, Math.PI, false);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+        drawLeg(backRightLegX, backRightLegY, backRightLegAngle, legHeight);
+
+        // 2. Draw the right side polygon (this will cover the top of the leg)
+        ctx.fillStyle = "#1a3d1a";
+        ctx.beginPath();
+        ctx.moveTo(table.x + table.width + 3, table.y); // top right of table
+        ctx.lineTo(table.x + table.width + sideHeight, table.y + sideHeight); // bevel
+        ctx.lineTo(
+          table.x + table.width + sideHeight,
+          table.y + table.height + sideHeight
+        );
+        ctx.lineTo(table.x + table.width - 8, table.y + table.height);
+        ctx.lineTo(table.x + table.width, table.y + table.height);
+        ctx.closePath();
+        ctx.fill();
+
+        // 3. Table shadow (subtle, rectangular, slightly offset)
+        ctx.save();
+        ctx.globalAlpha = 0.13;
+        ctx.fillStyle = "#000";
+        ctx.fillRect(
+          table.x + 8,
+          table.y + table.height + sideHeight + 4,
+          table.width - 16,
+          14
+        );
+        ctx.restore();
+
+        // 4. Draw the other legs (front left, front right)
+        ctx.fillStyle = "#333";
+        const legAngle = -0.18;
+        drawLeg(
+          table.x + 16,
+          table.y + table.height + sideHeight,
+          legAngle,
+          32
+        );
+        drawLeg(
+          table.x + table.width - 16 - legWidth,
+          table.y + table.height + sideHeight,
+          legAngle,
+          32
+        );
+
+        // 5. Draw the front side polygon
+        ctx.fillStyle = "#1a3d1a";
+        ctx.beginPath();
+        ctx.moveTo(table.x, table.y + table.height);
+        ctx.lineTo(table.x + table.width - 8, table.y + table.height);
+        ctx.lineTo(
+          table.x + table.width + sideHeight,
+          table.y + table.height + sideHeight
+        );
+        ctx.lineTo(table.x + 8, table.y + table.height + sideHeight);
+        ctx.closePath();
+        ctx.fill();
+
+        // 6. Table top (drawn after sides)
         ctx.fillStyle = "#0d4d0d";
         ctx.fillRect(table.x, table.y, table.width, table.height);
 
-        // Table border
+        // 7. Table border
         ctx.strokeStyle = "#fff";
         ctx.lineWidth = 4;
         ctx.strokeRect(table.x, table.y, table.width, table.height);
@@ -586,7 +663,7 @@
             ctx.globalAlpha = 0.5 * (1 - elapsed / 900) + 0.3;
             ctx.beginPath();
             ctx.arc(bouncePing.x, bouncePing.y, radius, 0, Math.PI * 2);
-            ctx.fillStyle = "#eee8"; // subtle light grey, semi-transparent
+            ctx.fillStyle = "#eee8";
             ctx.fill();
             ctx.globalAlpha = 1 - elapsed / 900;
             ctx.lineWidth = 5;
