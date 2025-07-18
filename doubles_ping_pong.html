@@ -636,8 +636,8 @@
         ctx.strokeRect(table.x, table.y, table.width, table.height);
 
         // Net
-        ctx.fillStyle = "#fff";
-        ctx.fillRect(table.x, table.netY - 3, table.width, 6);
+        // ctx.fillStyle = "#fff";
+        // ctx.fillRect(table.x, table.netY - 3, table.width, 6);
 
         // Center line
         ctx.strokeStyle = "#fff";
@@ -676,6 +676,224 @@
             bouncePing = null;
           }
         }
+
+        // Lob Pong bar (replaces net, with shadow for height illusion)
+        // Bar parameters
+        const barHeight = 22; // visual height of the bar above the table
+        const barThickness = 6; // thickness of the blue bar
+        const barLegWidth = 5;
+        const barLegHeight = barHeight;
+        const barY = table.netY - 3 - barHeight; // bar sits above the net line
+        const barGap = 4; // small gap from table border
+        const leftX = table.x + barGap;
+        const rightX = table.x + table.width - barGap;
+
+        // Draw shadow under the bar (rounded rectangle, full table width)
+        ctx.save();
+        ctx.globalAlpha = 0.18;
+        ctx.fillStyle = "#000";
+        const shadowY = table.netY + 5;
+        const shadowHeight = 5;
+        const shadowRadius = 6;
+        const shadowX = table.x + 8;
+        const shadowWidth = table.width;
+        ctx.beginPath();
+        ctx.moveTo(shadowX + shadowRadius, shadowY);
+        ctx.lineTo(shadowX + shadowWidth - shadowRadius, shadowY);
+        ctx.arcTo(
+          shadowX + shadowWidth,
+          shadowY,
+          shadowX + shadowWidth,
+          shadowY + shadowRadius,
+          shadowRadius
+        );
+        ctx.lineTo(
+          shadowX + shadowWidth,
+          shadowY + shadowHeight - shadowRadius
+        );
+        ctx.arcTo(
+          shadowX + shadowWidth,
+          shadowY + shadowHeight,
+          shadowX + shadowWidth - shadowRadius,
+          shadowY + shadowHeight,
+          shadowRadius
+        );
+        ctx.lineTo(shadowX + shadowRadius, shadowY + shadowHeight);
+        ctx.arcTo(
+          shadowX,
+          shadowY + shadowHeight,
+          shadowX,
+          shadowY + shadowHeight - shadowRadius,
+          shadowRadius
+        );
+        ctx.lineTo(shadowX, shadowY + shadowRadius);
+        ctx.arcTo(
+          shadowX,
+          shadowY,
+          shadowX + shadowRadius,
+          shadowY,
+          shadowRadius
+        );
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        // Draw left leg (white)
+        // ctx.fillStyle = "#fff";
+        // ctx.fillRect(
+        //   leftX,
+        //   table.netY - 3 - barLegHeight,
+        //   barLegWidth,
+        //   barLegHeight
+        // );
+        // Draw right leg (white)
+        // ctx.fillRect(
+        //   rightX - barLegWidth,
+        //   table.netY - 3 - barLegHeight,
+        //   barLegWidth,
+        //   barLegHeight
+        // );
+
+        // Draw blue bar (slightly foreshortened/angled)
+        // ctx.save();
+        // ctx.beginPath();
+        // // Slight angle: bar is higher at the left, lower at the right
+        // ctx.moveTo(leftX + barLegWidth, barY + 2); // left top
+        // ctx.lineTo(rightX - barLegWidth, barY + 7); // right top (lower)
+        // ctx.lineTo(rightX - barLegWidth, barY + 7 + barThickness);
+        // ctx.lineTo(leftX + barLegWidth, barY + 2 + barThickness);
+        // ctx.closePath();
+        // ctx.fillStyle = "#2196f3";
+        // ctx.fill();
+        // ctx.restore();
+
+        // Draw a thin black line for the net (visual only, not the Lob Pong bar)
+        ctx.fillStyle = "#111";
+        ctx.fillRect(table.x + 5, table.netY - 1, table.width - 10, 2);
+
+        // Draw angled white side posts with rounded tops
+        function drawAngledPost(x, y, height, width, angle) {
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(angle);
+          ctx.fillStyle = "#fff";
+          ctx.fillRect(0, -height, width, height);
+          // Draw rounded top
+          ctx.beginPath();
+          ctx.arc(width / 2, -height, width / 2, Math.PI, 0, false);
+          ctx.fill();
+          ctx.restore();
+        }
+        // Left post (angle up and to the right)
+        drawAngledPost(leftX, table.netY - 3, 50, barLegWidth, -0.35);
+        // Right post (angle up and to the right)
+        drawAngledPost(
+          rightX - barLegWidth,
+          table.netY - 3,
+          50,
+          barLegWidth,
+          -0.35
+        );
+
+        // Calculate the top center of each angled post
+        const postAngle = -0.35;
+        const postHeight = 54;
+        // Left post top center
+        const leftPostTopX =
+          leftX + Math.sin(postAngle) * postHeight + barLegWidth / 2;
+        const leftPostTopY = table.netY - 3 - Math.cos(postAngle) * postHeight;
+        // Right post top center
+        const rightPostTopX =
+          rightX -
+          barLegWidth +
+          Math.sin(postAngle) * postHeight +
+          barLegWidth / 2;
+        const rightPostTopY = table.netY - 3 - Math.cos(postAngle) * postHeight;
+
+        // Draw blue bar (connects the tops of the posts)
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(leftPostTopX, leftPostTopY);
+        ctx.lineTo(rightPostTopX, rightPostTopY);
+        ctx.lineTo(rightPostTopX, rightPostTopY + barThickness);
+        ctx.lineTo(leftPostTopX, leftPostTopY + barThickness);
+        ctx.closePath();
+        ctx.fillStyle = "#2196f3";
+        ctx.fill();
+        ctx.restore();
+
+        // Draw blue bar as a rounded rectangle (capsule) connecting the tops of the posts
+        function drawRoundedRect(ctx, x, y, width, height, radius) {
+          ctx.beginPath();
+          ctx.moveTo(x + radius, y);
+          ctx.lineTo(x + width - radius, y);
+          ctx.arcTo(x + width, y, x + width, y + radius, radius);
+          ctx.lineTo(x + width, y + height - radius);
+          ctx.arcTo(
+            x + width,
+            y + height,
+            x + width - radius,
+            y + height,
+            radius
+          );
+          ctx.lineTo(x + radius, y + height);
+          ctx.arcTo(x, y + height, x, y + height - radius, radius);
+          ctx.lineTo(x, y + radius);
+          ctx.arcTo(x, y, x + radius, y, radius);
+          ctx.closePath();
+          ctx.fill();
+        }
+        // Calculate bar position and size
+        const barX = leftX + barLegWidth;
+        const barYTop = leftPostTopY; // use the left post's top center y
+        const barWidth = rightPostTopX - leftPostTopX;
+        const barRadius = barThickness / 2;
+        ctx.save();
+        ctx.fillStyle = "#2196f3";
+        drawRoundedRect(
+          ctx,
+          leftPostTopX,
+          leftPostTopY,
+          barWidth,
+          barThickness,
+          barRadius
+        );
+        ctx.restore();
+
+        // After drawing the blue bar between the ends of the two posts
+        // Calculate the midpoint of the blue bar
+        const midX = (leftPostTopX + rightPostTopX) / 2;
+        const midY = (leftPostTopY + rightPostTopY) / 2;
+        ctx.save();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(midX, midY);
+        ctx.lineTo(midX, midY + 6);
+        ctx.stroke();
+        ctx.restore();
+
+        // Draw a small white vertical line in the middle of the blue bar
+        const midBarX = (leftPostTopX + rightPostTopX) / 2;
+        const midBarY = (leftPostTopY + rightPostTopY) / 2;
+        ctx.save();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(midBarX, midBarY);
+        ctx.lineTo(midBarX, midBarY + 6);
+        ctx.stroke();
+        ctx.restore();
+
+        // Draw the left and right white side posts OVER the blue bar
+        drawAngledPost(leftX, table.netY - 3, 50, barLegWidth, -0.35);
+        drawAngledPost(
+          rightX - barLegWidth,
+          table.netY - 3,
+          50,
+          barLegWidth,
+          -0.35
+        );
       }
 
       function drawPlayers() {
